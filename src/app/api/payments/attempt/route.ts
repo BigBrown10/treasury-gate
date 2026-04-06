@@ -1,0 +1,143 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+import {
+  getExecuteVendorPaymentTool,
+  getBankBalanceTool,
+  getPendingInvoicesTool,
+  mapAuth0InterruptToStatus,
+} from "@/lib/agent/tools";
+import { getInvoicePaymentEvidence } from "@/lib/server/stripe";
+
+const schema = z.object({
+  itemId: z.string().min(1),
+  vendor: z.string().min(1),
+  amountCents: z.number().int().positive(),
+  invoiceId: z.string().optional(),
+  threadId: z.string().optional(),
+});
+
+type AgentLog = {
+  at: string;
+  step: string;
+  detail: string;
+};
+
+function log(step: string, detail: string): AgentLog {
+  return { at: new Date().toISOString(), step, detail };
+}
+
+export async function POST(request: NextRequest) {
+  const userId = request.headers.get("x-user-id") ?? "demo-user";
+
+  try {
+    const body = await request.json();
+    const input = schema.parse(body);
+    const threadId = input.threadId ?? crypto.randomUUID();
+    const agentLogs: AgentLog[] = [log("request_received", `item=${input.itemId}, thread=${threadId}`)];
+
+    const [balance, invoices] = await Promise.all([
+      getBankBalanceTool.invoke(),
+      getPendingInvoicesTool.invoke(),
+    ]);
+
+    agentLogs.push(
+      log(
+        "read_tools_completed",
+        `available=${balance.available.toFixed(2)} ${balance.isoCurrencyCode}, openInvoices=${invoices.length}`,
+      ),
+    );
+
+    const match = invoices.find((invoice) => {
+      if (input.invoiceId) {
+        return invoice.id === input.invoiceId;
+      }
+
+      const amountMatch = invoice.amountDue === input.amountCents;
+      const vendorMatch = `${invoice.customerName ?? ""} ${invoice.description ?? ""}`
+        .toLowerCase()
+        .includes(input.vendor.toLowerCase());
+      return amountMatch && vendorMatch;
+    });
+
+    if (!match) {
+      return NextResponse.json({
+        itemId: input.itemId,
+        threadId,
+        status: "waiting_invoice",
+        agentLogs: [...agentLogs, log("invoice_not_found", "No matching open invoice found yet")],
+        timeline: [
+          `No open invoice found for ${input.vendor} at ${(input.amountCents / 100).toFixed(2)}.`,
+          "Waiting for invoice to be created/finalized.",
+        ],
+      });
+    }
+
+    if (balance.available * 100 < match.amountDue) {
+      return NextResponse.json({
+        itemId: input.itemId,
+        threadId,
+        status: "insufficient_funds",
+        agentLogs: [...agentLogs, log("insufficient_funds", `need=${match.amountDue}, available=${balance.available * 100}`)],
+        timeline: [
+          `Insufficient liquidity for invoice ${match.id}.`,
+          `Available: ${balance.available.toFixed(2)} ${balance.isoCurrencyCode}`,
+        ],
+      });
+    }
+
+    const paymentResultRaw = await getExecuteVendorPaymentTool().invoke({
+      invoiceId: match.id,
+      expectedAmountCents: match.amountDue,
+      userId,
+      threadId,
+    });
+
+    void paymentResultRaw;
+
+    const evidence = await getInvoicePaymentEvidence(match.id);
+
+    return NextResponse.json({
+      itemId: input.itemId,
+      threadId,
+      status: evidence.verifiedPaid ? "completed" : "payment_unverified",
+      payment: {
+        status: evidence.status,
+        verifiedPaid: evidence.verifiedPaid,
+        amountPaid: evidence.amountPaid,
+        currency: evidence.currency,
+        receiptUrl: evidence.hostedInvoiceUrl ?? evidence.stripeInvoiceUrl,
+        stripeInvoiceUrl: evidence.stripeInvoiceUrl,
+      },
+      agentLogs: [
+        ...agentLogs,
+        log(
+          "payment_evidence",
+          `status=${evidence.status}, verifiedPaid=${evidence.verifiedPaid}, amountPaid=${evidence.amountPaid}`,
+        ),
+      ],
+      timeline: [
+        `Matched invoice ${match.id}.`,
+        "Approval requested via Auth0 async authorization.",
+        evidence.verifiedPaid
+          ? "Payment verified as paid in Stripe."
+          : "Stripe did not report paid status yet.",
+      ],
+    });
+  } catch (error) {
+    const mapped = mapAuth0InterruptToStatus(error);
+    if (mapped) {
+      return NextResponse.json(
+        {
+          status: mapped.status,
+          timeline: [mapped.message],
+          retryAfterSeconds: mapped.retryAfterSeconds,
+        },
+        { status: 202 },
+      );
+    }
+
+    const message = error instanceof Error ? error.message : "Unknown payment attempt error";
+    return NextResponse.json({ status: "timed_out", error: message }, { status: 500 });
+  }
+}

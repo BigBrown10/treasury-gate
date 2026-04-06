@@ -1,4 +1,4 @@
-import { ChatPanel } from "@/components/chat-panel";
+import { AutopayQueue } from "@/components/autopay-queue";
 import { TreasuryOverview } from "@/components/treasury-overview";
 import { getTreasurySnapshot } from "@/lib/server/treasury";
 
@@ -19,7 +19,7 @@ export default async function Home() {
 
         <div className="relative mx-auto grid w-full max-w-[1400px] gap-6 lg:grid-cols-[1.15fr,1fr]">
           <TreasuryOverview snapshot={treasuryResult.snapshot} />
-          <ChatPanel />
+          <AutopayQueue />
         </div>
       </main>
     );

@@ -16,6 +16,13 @@ export type PendingInvoice = {
   createdAt: string;
 };
 
+export type CreateInvoiceInput = {
+  vendor: string;
+  amountCents: number;
+  currency?: string;
+  description?: string;
+};
+
 export type VendorPaymentResult = {
   invoiceId: string;
   status: string | null;
@@ -61,6 +68,27 @@ function formatMoneyFromCents(amount: number): string {
   return currencyFormatter.format(amount / 100);
 }
 
+function normalizeInvoice(invoice: Stripe.Invoice): PendingInvoice {
+  const customerName =
+    typeof invoice.customer === "object" && invoice.customer !== null
+      ? "name" in invoice.customer
+        ? invoice.customer.name ?? null
+        : null
+      : null;
+
+  return {
+    id: invoice.id,
+    amountDue: invoice.amount_due,
+    amountDueDisplay: formatMoneyFromCents(invoice.amount_due),
+    currency: invoice.currency.toUpperCase(),
+    customerName,
+    description: invoice.description,
+    hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+    status: invoice.status,
+    createdAt: new Date(invoice.created * 1000).toISOString(),
+  };
+}
+
 export async function getPendingInvoices(): Promise<PendingInvoice[]> {
   const env = getEnv();
   const stripe = getStripeClient();
@@ -71,26 +99,38 @@ export async function getPendingInvoices(): Promise<PendingInvoice[]> {
     expand: ["data.customer"],
   });
 
-  return result.data.map((invoice) => {
-    const customerName =
-      typeof invoice.customer === "object" && invoice.customer !== null
-        ? "name" in invoice.customer
-          ? invoice.customer.name ?? null
-          : null
-        : null;
+  return result.data.map((invoice) => normalizeInvoice(invoice));
+}
 
-    return {
-      id: invoice.id,
-      amountDue: invoice.amount_due,
-      amountDueDisplay: formatMoneyFromCents(invoice.amount_due),
-      currency: invoice.currency.toUpperCase(),
-      customerName,
-      description: invoice.description,
-      hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
-      status: invoice.status,
-      createdAt: new Date(invoice.created * 1000).toISOString(),
-    };
+export async function createOpenInvoiceForVendor(
+  input: CreateInvoiceInput,
+): Promise<PendingInvoice> {
+  const stripe = getStripeClient();
+  const normalizedVendor = input.vendor.trim();
+
+  const customer = await stripe.customers.create({
+    name: normalizedVendor,
+    description: `TreasuryGate autopay customer for ${normalizedVendor}`,
+    email: `${normalizedVendor.toLowerCase().replace(/[^a-z0-9]/g, "") || "vendor"}@treasurygate.test`,
   });
+
+  await stripe.invoiceItems.create({
+    customer: customer.id,
+    amount: input.amountCents,
+    currency: (input.currency ?? "usd").toLowerCase(),
+    description: input.description ?? `${normalizedVendor} payable`,
+  });
+
+  const draftInvoice = await stripe.invoices.create({
+    customer: customer.id,
+    auto_advance: false,
+    collection_method: "send_invoice",
+    days_until_due: 30,
+    description: input.description ?? `${normalizedVendor} payable`,
+  });
+
+  const openInvoice = await stripe.invoices.finalizeInvoice(draftInvoice.id);
+  return normalizeInvoice(openInvoice);
 }
 
 export async function payInvoice(
