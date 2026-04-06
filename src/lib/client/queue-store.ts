@@ -19,6 +19,7 @@ export type QueueItem = {
   id: string;
   category: "salary" | "supplies" | "logistics" | "other";
   recurrence: "one_time" | "monthly";
+  autoCreateInvoice: boolean;
   vendor: string;
   recipientName?: string;
   recipientEmail?: string;

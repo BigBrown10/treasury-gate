@@ -73,6 +73,7 @@ export function ItemsManager() {
       id,
       category,
       recurrence,
+      autoCreateInvoice,
       vendor: trimmedVendor,
       recipientName: recipientName.trim() || undefined,
       recipientEmail: trimmedRecipientEmail || undefined,
@@ -298,6 +299,7 @@ export function ItemsManager() {
               <p className="mt-1 text-xs text-white/70">Due: {new Date(item.dueAt).toLocaleString()}</p>
               <p className="text-xs text-white/70">Category: {item.category}</p>
               <p className="text-xs text-white/70">Recurrence: {item.recurrence === "monthly" ? "Monthly" : "One-time"}</p>
+              <p className="text-xs text-white/70">Auto Invoice: {item.autoCreateInvoice ? "Enabled" : "Disabled"}</p>
               {item.recipientName && <p className="text-xs text-white/70">Recipient: {item.recipientName}</p>}
               {item.recipientEmail && <p className="text-xs text-white/70">Recipient Email: {item.recipientEmail}</p>}
               {item.invoiceId && <p className="text-xs text-white/70">Invoice: {item.invoiceId}</p>}

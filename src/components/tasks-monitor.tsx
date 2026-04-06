@@ -76,6 +76,47 @@ export function TasksMonitor() {
     isProcessingRef.current = true;
 
     try {
+      let invoiceId = item.invoiceId;
+
+      if (!invoiceId && item.autoCreateInvoice) {
+        const invoiceResponse = await fetch("/api/payments/create-invoice", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            vendor: item.vendor,
+            recipientName: item.recipientName,
+            recipientEmail: item.recipientEmail,
+            amountCents: item.amountCents,
+            description: `${item.vendor} recurring task generated at ${new Date().toLocaleString()}`,
+          }),
+        });
+
+        const invoicePayload = (await invoiceResponse.json()) as
+          | { invoice: { id: string; hostedInvoiceUrl: string | null } }
+          | { error: string };
+
+        if (!invoiceResponse.ok || "error" in invoicePayload) {
+          throw new Error("error" in invoicePayload ? invoicePayload.error : "Failed to auto-create invoice");
+        }
+
+        invoiceId = invoicePayload.invoice.id;
+
+        setItems((current) =>
+          current.map((entry) =>
+            entry.id === item.id
+              ? {
+                  ...entry,
+                  invoiceId,
+                  invoiceUrl: invoicePayload.invoice.hostedInvoiceUrl ?? undefined,
+                  timeline: [...entry.timeline, `Auto-created invoice ${invoiceId}`],
+                }
+              : entry,
+          ),
+        );
+      }
+
       const response = await fetch("/api/payments/attempt", {
         method: "POST",
         headers: {
@@ -85,7 +126,7 @@ export function TasksMonitor() {
           itemId: item.id,
           vendor: item.vendor,
           amountCents: item.amountCents,
-          invoiceId: item.invoiceId,
+          invoiceId,
           threadId: forcedThreadId ?? item.threadId,
         }),
       });
@@ -346,9 +387,9 @@ export function TasksMonitor() {
         </section>
 
         {activePanel && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 px-4 py-8 backdrop-blur-md" onClick={() => setActivePanel(null)}>
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/72 px-4 py-8 backdrop-blur-md" onClick={() => setActivePanel(null)}>
             <article
-              className="modal-pop modal-scroll relative max-h-[85vh] w-full max-w-4xl overflow-auto rounded-3xl border border-orange-100/30 bg-gradient-to-b from-[#261215] to-[#160d15] p-6 shadow-[0_20px_80px_rgba(255,110,70,.24)]"
+              className="modal-pop modal-scroll relative my-4 max-h-[calc(100vh-4rem)] w-full max-w-5xl overflow-auto rounded-3xl border border-orange-100/30 bg-gradient-to-b from-[#261215] to-[#160d15] p-6 shadow-[0_20px_80px_rgba(255,110,70,.24)]"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-3">
@@ -372,7 +413,7 @@ export function TasksMonitor() {
                 {modalItems.map((item) => (
                   <div key={`${item.id}-${activePanel}`} className={`rounded-2xl border p-4 text-sm ${statusTone[item.status]}`}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-semibold text-white">{item.vendor} - ${(item.amountCents / 100).toFixed(2)}</p>
+                      <p className="break-words font-semibold text-white">{item.vendor} - ${(item.amountCents / 100).toFixed(2)}</p>
                       <p className="rounded-full border border-white/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-white/85">
                         {statusLabel[item.status]}
                       </p>
@@ -382,8 +423,8 @@ export function TasksMonitor() {
                     </div>
                     <p className="mt-1 text-xs text-white/75">Due: {new Date(item.dueAt).toLocaleString()}</p>
                     <p className="text-xs text-white/75">Recurrence: {item.recurrence === "monthly" ? "Monthly" : "One-time"}</p>
-                    {item.recipientName && <p className="text-xs text-white/75">Recipient: {item.recipientName}</p>}
-                    {item.recipientEmail && <p className="text-xs text-white/75">Recipient Email: {item.recipientEmail}</p>}
+                    {item.recipientName && <p className="break-words text-xs text-white/75">Recipient: {item.recipientName}</p>}
+                    {item.recipientEmail && <p className="break-words text-xs text-white/75">Recipient Email: {item.recipientEmail}</p>}
 
                     {activePanel === "finished" && (
                       <p className="text-xs text-white/75">Paid: ${((item.payment?.amountPaid ?? item.amountCents) / 100).toFixed(2)}</p>
@@ -407,11 +448,11 @@ export function TasksMonitor() {
                         {!reviewLoading[item.id] && reviewsByItemId[item.id] && (
                           <div className="mt-2 rounded-lg bg-white/5 p-3 text-xs text-white/85">
                             <p className="font-semibold text-white">{reviewsByItemId[item.id].title}</p>
-                            <p className="mt-1">{reviewsByItemId[item.id].summary}</p>
+                            <p className="mt-1 break-words">{reviewsByItemId[item.id].summary}</p>
                             <p className="mt-2 uppercase tracking-[0.1em] text-orange-100/80">
                               Risk: {reviewsByItemId[item.id].riskLevel}
                             </p>
-                            <p className="mt-1 text-white/75">Next: {reviewsByItemId[item.id].nextAction}</p>
+                            <p className="mt-1 break-words text-white/75">Next: {reviewsByItemId[item.id].nextAction}</p>
                           </div>
                         )}
                       </div>

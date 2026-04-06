@@ -25,6 +25,14 @@ type AgentLog = {
 
 const DEFAULT_RETRY_SECONDS = 20;
 
+const EVIDENCE_RETRY_ATTEMPTS = 3;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 function log(step: string, detail: string): AgentLog {
   return { at: new Date().toISOString(), step, detail };
 }
@@ -145,7 +153,16 @@ export async function POST(request: NextRequest) {
 
     void paymentResultRaw;
 
-    const evidence = await getInvoicePaymentEvidence(match.id);
+    let evidence = await getInvoicePaymentEvidence(match.id);
+    if (!evidence.verifiedPaid) {
+      for (let attempt = 0; attempt < EVIDENCE_RETRY_ATTEMPTS; attempt += 1) {
+        await delay(800);
+        evidence = await getInvoicePaymentEvidence(match.id);
+        if (evidence.verifiedPaid) {
+          break;
+        }
+      }
+    }
 
     return NextResponse.json({
       itemId: input.itemId,
