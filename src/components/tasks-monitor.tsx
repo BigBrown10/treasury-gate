@@ -26,6 +26,32 @@ type AiReview = {
   nextAction: string;
 };
 
+function nextMonthIso(currentDueAt: string): string {
+  const date = new Date(currentDueAt);
+  const copy = new Date(date);
+  copy.setMonth(copy.getMonth() + 1);
+  return copy.toISOString();
+}
+
+function getApprovalState(item: QueueItem): {
+  label: string;
+  tone: string;
+} {
+  if (item.status === "awaiting_approval") {
+    return { label: "Approval Pending", tone: "border-amber-300/45 bg-amber-300/10 text-amber-100" };
+  }
+
+  if (["completed", "payment_unverified"].includes(item.status)) {
+    return { label: "Approved", tone: "border-emerald-300/45 bg-emerald-300/10 text-emerald-100" };
+  }
+
+  if (["denied", "timed_out"].includes(item.status)) {
+    return { label: "Approval Blocked", tone: "border-rose-300/45 bg-rose-300/10 text-rose-100" };
+  }
+
+  return { label: "Not Requested Yet", tone: "border-white/25 bg-white/5 text-white/80" };
+}
+
 export function TasksMonitor() {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [activePanel, setActivePanel] = useState<TaskPanel>(null);
@@ -74,26 +100,66 @@ export function TasksMonitor() {
       const nextAttemptAt = new Date(Date.now() + retryAfterSeconds * 1000).toISOString();
 
       setItems((current) =>
-        current.map((entry) => {
-          if (entry.id !== item.id) {
-            return entry;
+        {
+          let recurringSpawn: QueueItem | null = null;
+
+          const updated = current.map((entry) => {
+            if (entry.id !== item.id) {
+              return entry;
+            }
+
+            const shouldRetry = ["awaiting_approval", "waiting_invoice", "payment_unverified"].includes(
+              result.status,
+            );
+
+            const nextEntry: QueueItem = {
+              ...entry,
+              threadId: result.threadId,
+              status: result.status,
+              retryAfterSeconds,
+              nextAttemptAt: shouldRetry ? nextAttemptAt : undefined,
+              payment: result.payment ?? entry.payment,
+              timeline: mergeTimeline(entry.timeline, result.timeline),
+              agentLogs: mergeLogs(entry.agentLogs, result.agentLogs),
+            };
+
+            const transitionedToCompleted = entry.status !== "completed" && result.status === "completed";
+            if (transitionedToCompleted && entry.recurrence === "monthly") {
+              recurringSpawn = {
+                ...entry,
+                id: crypto.randomUUID(),
+                status: "queued",
+                threadId: undefined,
+                invoiceId: undefined,
+                invoiceUrl: undefined,
+                payment: undefined,
+                retryAfterSeconds: undefined,
+                nextAttemptAt: undefined,
+                createdAt: new Date().toISOString(),
+                dueAt: nextMonthIso(entry.dueAt),
+                timeline: [
+                  "Monthly recurring task spawned.",
+                  `Next run scheduled for ${new Date(nextMonthIso(entry.dueAt)).toLocaleString()}.`,
+                ],
+                agentLogs: [
+                  {
+                    at: new Date().toISOString(),
+                    step: "recurrence_spawned",
+                    detail: `sourceItem=${entry.id}, recurrence=monthly`,
+                  },
+                ],
+              };
+            }
+
+            return nextEntry;
+          });
+
+          if (recurringSpawn) {
+            return [recurringSpawn, ...updated];
           }
 
-          const shouldRetry = ["awaiting_approval", "waiting_invoice", "payment_unverified"].includes(
-            result.status,
-          );
-
-          return {
-            ...entry,
-            threadId: result.threadId,
-            status: result.status,
-            retryAfterSeconds,
-            nextAttemptAt: shouldRetry ? nextAttemptAt : undefined,
-            payment: result.payment ?? entry.payment,
-            timeline: mergeTimeline(entry.timeline, result.timeline),
-            agentLogs: mergeLogs(entry.agentLogs, result.agentLogs),
-          };
-        }),
+          return updated;
+        },
       );
     } catch (runError) {
       setItems((current) =>
@@ -311,7 +377,13 @@ export function TasksMonitor() {
                         {statusLabel[item.status]}
                       </p>
                     </div>
+                    <div className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] ${getApprovalState(item).tone}`}>
+                      {getApprovalState(item).label}
+                    </div>
                     <p className="mt-1 text-xs text-white/75">Due: {new Date(item.dueAt).toLocaleString()}</p>
+                    <p className="text-xs text-white/75">Recurrence: {item.recurrence === "monthly" ? "Monthly" : "One-time"}</p>
+                    {item.recipientName && <p className="text-xs text-white/75">Recipient: {item.recipientName}</p>}
+                    {item.recipientEmail && <p className="text-xs text-white/75">Recipient Email: {item.recipientEmail}</p>}
 
                     {activePanel === "finished" && (
                       <p className="text-xs text-white/75">Paid: ${((item.payment?.amountPaid ?? item.amountCents) / 100).toFixed(2)}</p>

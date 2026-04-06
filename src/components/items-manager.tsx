@@ -13,7 +13,10 @@ import {
 
 export function ItemsManager() {
   const [category, setCategory] = useState<QueueItem["category"] | "">("");
+  const [recurrence, setRecurrence] = useState<QueueItem["recurrence"]>("one_time");
   const [vendor, setVendor] = useState("");
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
   const [amount, setAmount] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
@@ -56,6 +59,12 @@ export function ItemsManager() {
       return;
     }
 
+    const trimmedRecipientEmail = recipientEmail.trim();
+    if (trimmedRecipientEmail.length > 0 && !/^\S+@\S+\.\S+$/.test(trimmedRecipientEmail)) {
+      setError("Recipient email format is invalid.");
+      return;
+    }
+
     setIsAdding(true);
     const amountCents = Math.round(parsedAmount * 100);
     const id = crypto.randomUUID();
@@ -63,7 +72,10 @@ export function ItemsManager() {
     const baseItem: QueueItem = {
       id,
       category,
+      recurrence,
       vendor: trimmedVendor,
+      recipientName: recipientName.trim() || undefined,
+      recipientEmail: trimmedRecipientEmail || undefined,
       amountCents,
       createdAt: nowIso(),
       dueAt: new Date(`${dueDate}T${dueTime}:00`).toISOString(),
@@ -90,6 +102,8 @@ export function ItemsManager() {
           },
           body: JSON.stringify({
             vendor: trimmedVendor,
+            recipientName: recipientName.trim() || undefined,
+            recipientEmail: trimmedRecipientEmail || undefined,
             amountCents,
             description: `${trimmedVendor} autopay item created at ${new Date().toLocaleString()}`,
           }),
@@ -173,9 +187,35 @@ export function ItemsManager() {
             <input
               value={vendor}
               onChange={(event) => setVendor(event.target.value)}
-              placeholder="e.g. Vercel, Payroll Team, Logistics Partner"
+              placeholder="Who receives this payment? e.g. Vercel"
               className="apple-input mt-1 w-full"
             />
+            <p className="mt-1 text-[11px] normal-case tracking-normal text-white/65">
+              Vendor is the payee organization label used for matching and reporting.
+            </p>
+          </label>
+
+          <label className="text-xs uppercase tracking-[0.14em] text-orange-100/75">
+            Recipient Name (optional)
+            <input
+              value={recipientName}
+              onChange={(event) => setRecipientName(event.target.value)}
+              placeholder="e.g. Mark Johnson"
+              className="apple-input mt-1 w-full"
+            />
+          </label>
+
+          <label className="text-xs uppercase tracking-[0.14em] text-orange-100/75">
+            Recipient Email (optional)
+            <input
+              value={recipientEmail}
+              onChange={(event) => setRecipientEmail(event.target.value)}
+              placeholder="e.g. mark@company.com"
+              className="apple-input mt-1 w-full"
+            />
+            <p className="mt-1 text-[11px] normal-case tracking-normal text-white/65">
+              If empty, TreasuryGate generates a safe test email for Stripe sandbox records.
+            </p>
           </label>
 
           <label className="text-xs uppercase tracking-[0.14em] text-orange-100/75">
@@ -206,6 +246,18 @@ export function ItemsManager() {
               placeholder="e.g. 500.00"
               className="apple-input mt-1 w-full"
             />
+          </label>
+
+          <label className="text-xs uppercase tracking-[0.14em] text-orange-100/75">
+            Recurrence
+            <select
+              value={recurrence}
+              onChange={(event) => setRecurrence(event.target.value as QueueItem["recurrence"])}
+              className="apple-input mt-1 w-full"
+            >
+              <option value="one_time">One-time</option>
+              <option value="monthly">Monthly</option>
+            </select>
           </label>
 
           <label className="col-span-full flex items-center gap-2 text-xs text-white/75">
@@ -245,6 +297,9 @@ export function ItemsManager() {
               </div>
               <p className="mt-1 text-xs text-white/70">Due: {new Date(item.dueAt).toLocaleString()}</p>
               <p className="text-xs text-white/70">Category: {item.category}</p>
+              <p className="text-xs text-white/70">Recurrence: {item.recurrence === "monthly" ? "Monthly" : "One-time"}</p>
+              {item.recipientName && <p className="text-xs text-white/70">Recipient: {item.recipientName}</p>}
+              {item.recipientEmail && <p className="text-xs text-white/70">Recipient Email: {item.recipientEmail}</p>}
               {item.invoiceId && <p className="text-xs text-white/70">Invoice: {item.invoiceId}</p>}
             </article>
           ))}

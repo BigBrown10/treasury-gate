@@ -15,7 +15,7 @@ export default function Home() {
               Verify Every Dollar.
             </h1>
             <p className="max-w-2xl text-lg leading-relaxed text-[#ffd8c0] sm:text-xl">
-              TreasuryGate is your command center for payable execution: create new payment requests, enforce approval gates, and close with proof your finance team can trust.
+              TreasuryGate is an agentic FinSecOps command center for payable execution: create new payment requests, enforce approval gates, and close with proof your finance team can trust.
             </p>
 
             <div className="flex flex-wrap gap-3">
@@ -52,17 +52,11 @@ export default function Home() {
       </section>
 
       <section className="border-b-2 border-[#f7a36f] bg-[#13070a] px-4 py-8 sm:px-8">
-        <div className="marquee-track mx-auto flex w-full max-w-[1400px] gap-10 overflow-hidden text-sm uppercase tracking-[0.16em] text-[#f7a36f]/70">
-          <span>Create New</span>
-          <span>Liquidity Check</span>
-          <span>Auth0 Approval</span>
-          <span>Stripe Execution</span>
-          <span>AI Task Review</span>
-          <span>Evidence-Backed Close</span>
-          <span>Create New</span>
-          <span>Liquidity Check</span>
-          <span>Auth0 Approval</span>
-          <span>Stripe Execution</span>
+        <div className="marquee-track mx-auto flex w-full max-w-[1400px] gap-10 overflow-hidden text-sm tracking-[0.04em] text-[#f7a36f]/82">
+          <span>TreasuryGate automates payment operations while your team keeps approval authority.</span>
+          <span>Agentic FinSecOps means each task is scheduled, reviewed, approved, executed, and verified with evidence.</span>
+          <span>Create recurring monthly payouts, monitor live risk, and close books with auditable Stripe proof.</span>
+          <span>TreasuryGate automates payment operations while your team keeps approval authority.</span>
         </div>
       </section>
 

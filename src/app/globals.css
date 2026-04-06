@@ -185,7 +185,12 @@ body {
 
 .marquee-track {
   white-space: nowrap;
-  animation: marqueeSlide 18s linear infinite;
+  width: max-content;
+  animation: marqueeSlide 28s linear infinite;
+}
+
+.marquee-track > span {
+  flex: 0 0 auto;
 }
 
 .modal-scroll {

@@ -18,6 +18,8 @@ export type PendingInvoice = {
 
 export type CreateInvoiceInput = {
   vendor: string;
+  recipientName?: string;
+  recipientEmail?: string;
   amountCents: number;
   currency?: string;
   description?: string;
@@ -116,11 +118,15 @@ export async function createOpenInvoiceForVendor(
 ): Promise<PendingInvoice> {
   const stripe = getStripeClient();
   const normalizedVendor = input.vendor.trim();
+  const normalizedRecipientName = input.recipientName?.trim() || normalizedVendor;
+  const normalizedRecipientEmail =
+    input.recipientEmail?.trim() ||
+    `${normalizedVendor.toLowerCase().replace(/[^a-z0-9]/g, "") || "vendor"}@treasurygate.test`;
 
   const customer = await stripe.customers.create({
-    name: normalizedVendor,
+    name: normalizedRecipientName,
     description: `TreasuryGate autopay customer for ${normalizedVendor}`,
-    email: `${normalizedVendor.toLowerCase().replace(/[^a-z0-9]/g, "") || "vendor"}@treasurygate.test`,
+    email: normalizedRecipientEmail,
   });
 
   await stripe.invoiceItems.create({

@@ -18,7 +18,10 @@ export type QueueStatus =
 export type QueueItem = {
   id: string;
   category: "salary" | "supplies" | "logistics" | "other";
+  recurrence: "one_time" | "monthly";
   vendor: string;
+  recipientName?: string;
+  recipientEmail?: string;
   amountCents: number;
   createdAt: string;
   dueAt: string;

@@ -5,6 +5,8 @@ import { createOpenInvoiceForVendor } from "@/lib/server/stripe";
 
 const schema = z.object({
   vendor: z.string().min(1),
+  recipientName: z.string().optional(),
+  recipientEmail: z.string().email().optional(),
   amountCents: z.number().int().positive(),
   description: z.string().optional(),
 });
@@ -16,6 +18,8 @@ export async function POST(request: NextRequest) {
 
     const invoice = await createOpenInvoiceForVendor({
       vendor: input.vendor,
+      recipientName: input.recipientName,
+      recipientEmail: input.recipientEmail,
       amountCents: input.amountCents,
       description: input.description,
     });
