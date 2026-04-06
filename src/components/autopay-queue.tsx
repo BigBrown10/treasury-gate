@@ -55,6 +55,14 @@ type AttemptResponse = {
   error?: string;
 };
 
+type TreasuryApiResponse = {
+  bankBalance: {
+    available: number;
+    isoCurrencyCode: string;
+    asOf: string;
+  };
+};
+
 const STORAGE_KEY = "treasurygate.autopay.queue.v1";
 
 const statusTone: Record<QueueStatus, string> = {
@@ -87,6 +95,14 @@ function nowIso(): string {
 
 function canAutoProcess(item: QueueItem): boolean {
   return ["queued", "waiting_invoice", "awaiting_approval", "payment_unverified"].includes(item.status);
+}
+
+function isLiveStatus(item: QueueItem): boolean {
+  return ["queued", "waiting_invoice", "awaiting_approval", "payment_unverified"].includes(item.status);
+}
+
+function isDueNow(item: QueueItem): boolean {
+  return new Date(item.dueAt).getTime() <= Date.now();
 }
 
 function isDueToday(item: QueueItem): boolean {
@@ -135,10 +151,12 @@ export function AutopayQueue() {
   const [vendor, setVendor] = useState("Vercel");
   const [amount, setAmount] = useState("50");
   const [dueDate, setDueDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dueTime, setDueTime] = useState("09:00");
   const [autoCreateInvoice, setAutoCreateInvoice] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<QueueItem[]>([]);
+  const [bankSignal, setBankSignal] = useState<TreasuryApiResponse["bankBalance"] | null>(null);
   const isProcessingRef = useRef(false);
 
   useEffect(() => {
@@ -160,6 +178,36 @@ export function AutopayQueue() {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }, [items]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function refreshBankSignal() {
+      try {
+        const response = await fetch("/api/treasury");
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = (await response.json()) as TreasuryApiResponse;
+        if (isMounted) {
+          setBankSignal(payload.bankBalance);
+        }
+      } catch {
+        // Ignore transient network failures for optional signal panel.
+      }
+    }
+
+    void refreshBankSignal();
+    const interval = window.setInterval(() => {
+      void refreshBankSignal();
+    }, 30000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
+  }, []);
+
   async function onAddItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -180,14 +228,14 @@ export function AutopayQueue() {
       vendor: vendor.trim(),
       amountCents,
       createdAt: nowIso(),
-      dueAt: new Date(`${dueDate}T09:00:00`).toISOString(),
+      dueAt: new Date(`${dueDate}T${dueTime}:00`).toISOString(),
       status: "queued",
       timeline: ["Payable item created."],
       agentLogs: [
         {
           at: nowIso(),
           step: "item_created",
-          detail: `category=${category}, vendor=${vendor.trim()}, amountCents=${amountCents}, dueAt=${dueDate}`,
+          detail: `category=${category}, vendor=${vendor.trim()}, amountCents=${amountCents}, dueAt=${dueDate} ${dueTime}`,
         },
       ],
     };
@@ -333,7 +381,7 @@ export function AutopayQueue() {
       }
 
       const salaryDue = items.filter(
-        (item) => item.category === "salary" && isDueToday(item) && canAutoProcess(item),
+        (item) => item.category === "salary" && isDueToday(item) && isDueNow(item) && canAutoProcess(item),
       );
 
       if (salaryDue.length > 0) {
@@ -344,7 +392,7 @@ export function AutopayQueue() {
         return;
       }
 
-      const next = items.find((item) => canAutoProcess(item));
+      const next = items.find((item) => canAutoProcess(item) && isDueNow(item));
       if (!next) {
         return;
       }
@@ -392,6 +440,37 @@ export function AutopayQueue() {
     };
   }, [items]);
 
+  const projectedSpentCents = useMemo(
+    () =>
+      items
+        .filter((item) => item.status === "completed")
+        .reduce((sum, item) => sum + (item.payment?.amountPaid ?? item.amountCents), 0),
+    [items],
+  );
+
+  const projectedAvailable = useMemo(() => {
+    if (!bankSignal) {
+      return null;
+    }
+
+    return bankSignal.available - projectedSpentCents / 100;
+  }, [bankSignal, projectedSpentCents]);
+
+  const scheduledTasks = useMemo(
+    () => items.filter((item) => item.status !== "completed" && !isDueNow(item)),
+    [items],
+  );
+
+  const liveTasks = useMemo(
+    () => items.filter((item) => isLiveStatus(item) && isDueNow(item)),
+    [items],
+  );
+
+  const completedTasks = useMemo(
+    () => items.filter((item) => item.status === "completed"),
+    [items],
+  );
+
   return (
     <section className="relative overflow-hidden rounded-[2rem] border border-white/20 bg-white/10 p-6 shadow-2xl backdrop-blur-2xl">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_10%,_rgba(99,102,241,.28),_transparent_40%)]" />
@@ -435,6 +514,23 @@ export function AutopayQueue() {
           <p className="mt-2 text-xs text-cyan-100">
             Approval UX note: CIBA approval is typically out-of-band (Auth0 Guardian/device prompt), not an in-page browser modal.
           </p>
+        </section>
+
+        <section className="rounded-2xl border border-cyan-200/25 bg-cyan-200/10 p-4">
+          <p className="text-xs uppercase tracking-[0.14em] text-cyan-100">Balance Signal</p>
+          {bankSignal ? (
+            <>
+              <p className="mt-1 text-sm text-white/90">
+                Plaid available: {bankSignal.available.toFixed(2)} {bankSignal.isoCurrencyCode}
+              </p>
+              <p className="text-sm text-white/90">Projected after completed tasks: {projectedAvailable?.toFixed(2)} {bankSignal.isoCurrencyCode}</p>
+              <p className="mt-1 text-xs text-cyan-100/90">
+                Plaid sandbox balances are not auto-decremented by Stripe payments. Projected balance subtracts executed task totals.
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-sm text-white/80">Fetching latest balance signal...</p>
+          )}
         </section>
 
         <section className="grid gap-3 xl:grid-cols-4">
@@ -523,6 +619,15 @@ export function AutopayQueue() {
             />
           </label>
           <label className="text-xs uppercase tracking-[0.14em] text-white/65">
+            Due time
+            <input
+              type="time"
+              value={dueTime}
+              onChange={(event) => setDueTime(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-cyan-200/60"
+            />
+          </label>
+          <label className="text-xs uppercase tracking-[0.14em] text-white/65">
             Amount (USD)
             <input
               value={amount}
@@ -550,66 +655,90 @@ export function AutopayQueue() {
           {error && <p className="col-span-full rounded-xl border border-rose-300/40 bg-rose-300/10 p-2 text-sm text-rose-100">{error}</p>}
         </form>
 
-        <div className="space-y-3">
-          {items.length === 0 && <p className="text-sm text-white/70">No queue items yet. Add one to start autonomous processing.</p>}
+        <div className="space-y-6">
+          {items.length === 0 && <p className="text-sm text-white/70">No tasks yet. Add one to start autonomous processing.</p>}
 
-          {items.map((item) => (
-            <article
-              key={item.id}
-              className={`rounded-2xl border p-4 text-sm text-white/90 ${statusTone[item.status]}`}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold">{item.vendor} - ${(item.amountCents / 100).toFixed(2)}</p>
-                <p className="rounded-full border border-white/30 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em]">
-                  {statusLabel[item.status]}
-                </p>
-              </div>
+          <section className="space-y-3">
+            <h3 className="text-lg font-semibold text-white">Scheduled Tasks</h3>
+            <p className="text-xs text-white/70">All tasks that are not completed yet (including future scheduled date/time).</p>
+            {scheduledTasks.length === 0 && <p className="text-sm text-white/60">No scheduled tasks.</p>}
+            {scheduledTasks.map((item) => (
+              <article key={`${item.id}-scheduled`} className={`rounded-2xl border p-4 text-sm text-white/90 ${statusTone[item.status]}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-semibold">{item.vendor} - ${(item.amountCents / 100).toFixed(2)}</p>
+                  <p className="rounded-full border border-white/30 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em]">{statusLabel[item.status]}</p>
+                </div>
+                <p className="mt-1 text-xs text-white/70">Category: {item.category}</p>
+                <p className="text-xs text-white/70">Due: {new Date(item.dueAt).toLocaleString()}</p>
+                {item.nextAttemptAt && <p className="text-xs text-amber-100">Next auto-attempt: {new Date(item.nextAttemptAt).toLocaleTimeString()}</p>}
+                {item.invoiceId && <p className="mt-2 text-xs text-white/75">Invoice: {item.invoiceId}</p>}
+              </article>
+            ))}
+          </section>
 
-              <p className="mt-1 text-xs text-white/70">Created: {new Date(item.createdAt).toLocaleString()}</p>
-              <p className="text-xs text-white/70">Category: {item.category}</p>
-              <p className="text-xs text-white/70">Due: {new Date(item.dueAt).toLocaleDateString()}</p>
-              {item.nextAttemptAt && (
-                <p className="text-xs text-amber-100">Next auto-attempt: {new Date(item.nextAttemptAt).toLocaleTimeString()}</p>
-              )}
+          <section className="space-y-3">
+            <h3 className="text-lg font-semibold text-white">Live Tasks</h3>
+            <p className="text-xs text-white/70">Tasks currently being processed or waiting for approval, with logs.</p>
+            {liveTasks.length === 0 && <p className="text-sm text-white/60">No live tasks right now.</p>}
+            {liveTasks.map((item) => (
+              <article key={`${item.id}-live`} className={`rounded-2xl border p-4 text-sm text-white/90 ${statusTone[item.status]}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-semibold">{item.vendor} - ${(item.amountCents / 100).toFixed(2)}</p>
+                  <p className="rounded-full border border-white/30 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em]">{statusLabel[item.status]}</p>
+                </div>
+                <p className="mt-1 text-xs text-white/70">Due: {new Date(item.dueAt).toLocaleString()}</p>
+                {item.payment?.stripeInvoiceUrl && (
+                  <a
+                    href={item.payment.stripeInvoiceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-flex text-xs underline decoration-dotted underline-offset-4"
+                  >
+                    Open Stripe invoice proof
+                  </a>
+                )}
 
-              {item.invoiceId && (
-                <p className="mt-2 text-xs text-white/75">Invoice: {item.invoiceId}</p>
-              )}
+                <details className="mt-3 rounded-xl border border-white/20 bg-black/25 p-3" open>
+                  <summary className="cursor-pointer">Latest logs ({item.agentLogs.length})</summary>
+                  <ul className="mt-2 space-y-2 text-xs text-white/80">
+                    {item.agentLogs.slice(-10).map((entry, index) => (
+                      <li key={`${item.id}-log-${index}`} className="rounded-md bg-white/5 p-2">
+                        <p className="font-medium">{entry.step}</p>
+                        <p className="text-white/60">{new Date(entry.at).toLocaleTimeString()}</p>
+                        <p>{entry.detail}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </article>
+            ))}
+          </section>
 
-              {item.payment?.stripeInvoiceUrl && (
-                <a
-                  href={item.payment.stripeInvoiceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 inline-flex text-xs underline decoration-dotted underline-offset-4"
-                >
-                  Open Stripe invoice proof
-                </a>
-              )}
-
-              <details className="mt-3 rounded-xl border border-white/20 bg-black/25 p-3">
-                <summary className="cursor-pointer">Timeline ({item.timeline.length})</summary>
-                <ul className="mt-2 space-y-1 text-xs text-white/80">
-                  {item.timeline.slice(-8).map((line, index) => (
-                    <li key={`${item.id}-timeline-${index}`}>- {line}</li>
-                  ))}
-                </ul>
-              </details>
-
-              <details className="mt-2 rounded-xl border border-white/20 bg-black/25 p-3">
-                <summary className="cursor-pointer">Agent logs ({item.agentLogs.length})</summary>
-                <ul className="mt-2 space-y-2 text-xs text-white/80">
-                  {item.agentLogs.slice(-8).map((entry, index) => (
-                    <li key={`${item.id}-log-${index}`} className="rounded-md bg-white/5 p-2">
-                      <p className="font-medium">{entry.step}</p>
-                      <p className="text-white/60">{new Date(entry.at).toLocaleTimeString()}</p>
-                      <p>{entry.detail}</p>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            </article>
-          ))}
+          <section className="space-y-3">
+            <h3 className="text-lg font-semibold text-white">Completed Tasks</h3>
+            <p className="text-xs text-white/70">All tasks verified as paid.</p>
+            {completedTasks.length === 0 && <p className="text-sm text-white/60">No completed tasks yet.</p>}
+            {completedTasks.map((item) => (
+              <article key={`${item.id}-completed`} className="rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm text-white/90">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-semibold">{item.vendor} - ${(item.amountCents / 100).toFixed(2)}</p>
+                  <p className="rounded-full border border-emerald-200/50 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-emerald-50">Completed</p>
+                </div>
+                <p className="mt-1 text-xs text-white/75">Paid amount: ${((item.payment?.amountPaid ?? item.amountCents) / 100).toFixed(2)}</p>
+                <p className="text-xs text-white/75">Due: {new Date(item.dueAt).toLocaleString()}</p>
+                {item.payment?.stripeInvoiceUrl && (
+                  <a
+                    href={item.payment.stripeInvoiceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-flex text-xs underline decoration-dotted underline-offset-4"
+                  >
+                    Open Stripe invoice proof
+                  </a>
+                )}
+              </article>
+            ))}
+          </section>
         </div>
       </div>
     </section>

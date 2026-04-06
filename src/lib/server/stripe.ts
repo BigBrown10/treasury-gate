@@ -135,10 +135,18 @@ export async function createOpenInvoiceForVendor(
     auto_advance: false,
     collection_method: "send_invoice",
     days_until_due: 30,
+    pending_invoice_items_behavior: "include",
     description: input.description ?? `${normalizedVendor} payable`,
   });
 
   const openInvoice = await stripe.invoices.finalizeInvoice(draftInvoice.id);
+
+  if (openInvoice.amount_due <= 0) {
+    throw new Error(
+      `Stripe returned a zero-amount invoice for ${normalizedVendor}. Check amount input and invoice item creation.`,
+    );
+  }
+
   return normalizeInvoice(openInvoice);
 }
 
