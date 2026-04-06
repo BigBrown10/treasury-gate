@@ -78,17 +78,21 @@ export async function getBankBalance(): Promise<BankBalance> {
     },
   });
 
-  const first = response.data.accounts[0];
-
-  if (!first) {
+  if (response.data.accounts.length === 0) {
     throw new Error("No Plaid sandbox account found.");
   }
 
+  // Pick the account with the highest available balance for a more realistic
+  // liquidity signal than blindly using the first returned account.
+  const highest = [...response.data.accounts].sort(
+    (a, b) => (b.balances.available ?? 0) - (a.balances.available ?? 0),
+  )[0];
+
   return {
-    accountName: first.name,
-    available: first.balances.available ?? 0,
-    current: first.balances.current ?? 0,
-    isoCurrencyCode: first.balances.iso_currency_code ?? "USD",
+    accountName: highest.name,
+    available: highest.balances.available ?? 0,
+    current: highest.balances.current ?? 0,
+    isoCurrencyCode: highest.balances.iso_currency_code ?? "USD",
     asOf: new Date().toISOString(),
   };
 }

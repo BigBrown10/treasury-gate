@@ -6,9 +6,19 @@ type ChatResponse = {
   threadId: string;
   status: "awaiting_approval" | "approved_executing" | "denied" | "timed_out" | "completed";
   timeline: string[];
+  agentLogs?: Array<{
+    at: string;
+    step: string;
+    detail: string;
+  }>;
   retryAfterSeconds?: number;
   payment?: {
     receiptUrl: string;
+    stripeInvoiceUrl?: string;
+    status?: string;
+    verifiedPaid?: boolean;
+    amountPaid?: number;
+    currency?: string;
   };
 };
 
@@ -170,14 +180,38 @@ export function ChatPanel({ initialPrompt }: ChatPanelProps) {
               ))}
             </ul>
             {response.payment?.receiptUrl && (
-              <a
-                href={response.payment.receiptUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex text-sm underline decoration-dotted underline-offset-4"
-              >
-                Open Stripe receipt/invoice URL
-              </a>
+              <div className="space-y-1 rounded-xl border border-white/20 bg-black/20 p-3 text-xs">
+                <p>Payment status: {response.payment.status ?? "unknown"}</p>
+                <p>Verified paid: {response.payment.verifiedPaid ? "yes" : "no"}</p>
+                {typeof response.payment.amountPaid === "number" && (
+                  <p>
+                    Amount paid: {(response.payment.amountPaid / 100).toFixed(2)} {response.payment.currency ?? "USD"}
+                  </p>
+                )}
+                <a
+                  href={response.payment.stripeInvoiceUrl ?? response.payment.receiptUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex text-sm underline decoration-dotted underline-offset-4"
+                >
+                  Open Stripe invoice in dashboard
+                </a>
+              </div>
+            )}
+
+            {!!response.agentLogs?.length && (
+              <details className="rounded-xl border border-white/20 bg-black/20 p-3 text-xs">
+                <summary className="cursor-pointer text-white/90">Agent logs ({response.agentLogs.length})</summary>
+                <ul className="mt-2 space-y-2">
+                  {response.agentLogs.map((entry) => (
+                    <li key={`${entry.at}-${entry.step}`} className="rounded-md bg-white/5 p-2">
+                      <p className="font-medium">{entry.step}</p>
+                      <p className="text-white/70">{new Date(entry.at).toLocaleTimeString()}</p>
+                      <p>{entry.detail}</p>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
           </div>
         )}

@@ -16,6 +16,61 @@ type MessageBody = {
   threadId?: string;
 };
 
+type AgentLogEntry = {
+  at: string;
+  step: string;
+  detail: string;
+};
+
+type NormalizedPayment = {
+  receiptUrl: string;
+  status: string;
+  amountPaid: number;
+  currency: string;
+  verifiedPaid: boolean;
+  stripeInvoiceUrl: string;
+};
+
+function log(step: string, detail: string): AgentLogEntry {
+  return {
+    at: new Date().toISOString(),
+    step,
+    detail,
+  };
+}
+
+function normalizePaymentResponse(rawPayment: unknown, invoiceId: string): NormalizedPayment {
+  const dashboardUrl = `https://dashboard.stripe.com/test/invoices/${encodeURIComponent(invoiceId)}`;
+
+  if (!rawPayment || typeof rawPayment !== "object") {
+    return {
+      receiptUrl: dashboardUrl,
+      status: "unknown",
+      amountPaid: 0,
+      currency: "USD",
+      verifiedPaid: false,
+      stripeInvoiceUrl: dashboardUrl,
+    };
+  }
+
+  const candidate = rawPayment as Record<string, unknown>;
+  const receiptUrl =
+    typeof candidate.receiptUrl === "string" && candidate.receiptUrl.length > 0
+      ? candidate.receiptUrl
+      : dashboardUrl;
+
+  const status = typeof candidate.status === "string" && candidate.status ? candidate.status : "unknown";
+  const amountPaid = typeof candidate.amountPaid === "number" ? candidate.amountPaid : 0;
+  const currency = typeof candidate.currency === "string" && candidate.currency ? candidate.currency : "USD";
+  const verifiedPaid = Boolean(candidate.verifiedPaid) || status === "paid";
+  const stripeInvoiceUrl =
+    typeof candidate.stripeInvoiceUrl === "string" && candidate.stripeInvoiceUrl.length > 0
+      ? candidate.stripeInvoiceUrl
+      : dashboardUrl;
+
+  return { receiptUrl, status, amountPaid, currency, verifiedPaid, stripeInvoiceUrl };
+}
+
 function parseIntentFallback(message: string): { amountCents: number | null; vendor: string | null } {
   const amountMatch = message.match(/\$(\d+(?:\.\d{1,2})?)/);
   const amountCents = amountMatch ? Math.round(Number.parseFloat(amountMatch[1]) * 100) : null;
@@ -48,21 +103,31 @@ async function parseIntent(message: string): Promise<{ amountCents: number | nul
 }
 
 export async function POST(request: NextRequest) {
+  const agentLogs: AgentLogEntry[] = [];
   const body = (await request.json()) as MessageBody;
   const message = body.message?.trim();
   const threadId = body.threadId ?? crypto.randomUUID();
   const userId = request.headers.get("x-user-id") ?? "demo-user";
+
+  agentLogs.push(log("request_received", `thread=${threadId}, user=${userId}`));
 
   if (!message) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
   }
 
   const intent = await parseIntent(message);
+  agentLogs.push(
+    log(
+      "intent_parsed",
+      `amountCents=${intent.amountCents ?? "null"}, vendor=${intent.vendor ?? "null"}`,
+    ),
+  );
 
   if (!intent.amountCents) {
     return NextResponse.json({
       threadId,
       status: "completed",
+      agentLogs,
       timeline: [
         "I could not find a dollar amount in your request.",
         "Try: 'Check if we have enough cash, and if so, pay the $500 Vercel invoice.'",
@@ -75,6 +140,13 @@ export async function POST(request: NextRequest) {
       getBankBalanceTool.invoke(),
       getPendingInvoicesTool.invoke(),
     ]);
+
+    agentLogs.push(
+      log(
+        "read_tools_completed",
+        `balance=${balance.isoCurrencyCode} ${balance.available.toFixed(2)}, openInvoices=${invoices.length}`,
+      ),
+    );
 
     const targetInvoice = invoices.find((invoice) => {
       const amountMatch = invoice.amountDue === intent.amountCents;
@@ -91,6 +163,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         threadId,
         status: "completed",
+        agentLogs,
         timeline: [
           `Bank balance check passed: ${balance.isoCurrencyCode} ${balance.available.toFixed(2)} available.`,
           `No open invoice matched amount $${(intent.amountCents / 100).toFixed(2)}${
@@ -104,6 +177,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         threadId,
         status: "completed",
+        agentLogs,
         timeline: [
           `Insufficient liquidity: available ${balance.isoCurrencyCode} ${balance.available.toFixed(2)}.`,
           `Invoice ${targetInvoice.id} requires ${(targetInvoice.amountDue / 100).toFixed(2)} ${targetInvoice.currency}.`,
@@ -117,19 +191,30 @@ export async function POST(request: NextRequest) {
       "Awaiting mobile approval via Auth0 CIBA push notification...",
     ];
 
-    const payment = await getExecuteVendorPaymentTool().invoke({
+    const paymentRaw = await getExecuteVendorPaymentTool().invoke({
       invoiceId: targetInvoice.id,
       expectedAmountCents: targetInvoice.amountDue,
       userId,
       threadId,
     });
 
+    const payment = normalizePaymentResponse(paymentRaw, targetInvoice.id);
+    agentLogs.push(
+      log(
+        "payment_executed",
+        `status=${payment.status}, verifiedPaid=${payment.verifiedPaid}, amountPaid=${payment.amountPaid}`,
+      ),
+    );
+
     timeline.push("Authorization approved. Executing Stripe payment now...");
-    timeline.push(`Invoice paid. Receipt: ${payment.receiptUrl}`);
+    timeline.push(`Invoice paid status: ${payment.status} (${payment.verifiedPaid ? "verified" : "not verified"}).`);
+    timeline.push(`Stripe Invoice URL: ${payment.stripeInvoiceUrl}`);
+    timeline.push(`Receipt link: ${payment.receiptUrl}`);
 
     return NextResponse.json({
       threadId,
       status: "completed",
+      agentLogs,
       timeline,
       payment,
     });
@@ -145,6 +230,7 @@ export async function POST(request: NextRequest) {
             "Payment execution paused for Auth0 asynchronous authorization.",
             mapped.message,
           ],
+          agentLogs: [...agentLogs, log("authorization_pending", mapped.message)],
           retryAfterSeconds: mapped.retryAfterSeconds,
         },
         { status: 202 },
@@ -156,6 +242,7 @@ export async function POST(request: NextRequest) {
       {
         threadId,
         status: "timed_out",
+        agentLogs: [...agentLogs, log("execution_error", messageText)],
         timeline: ["Payment flow failed before completion.", messageText],
       },
       { status: 500 },
