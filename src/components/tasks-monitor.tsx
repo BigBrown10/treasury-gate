@@ -1,0 +1,244 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import {
+  AttemptResponse,
+  QueueItem,
+  canAutoProcess,
+  isDueNow,
+  isDueToday,
+  isLiveStatus,
+  loadQueueItems,
+  mergeLogs,
+  mergeTimeline,
+  saveQueueItems,
+  statusLabel,
+  statusTone,
+} from "@/lib/client/queue-store";
+
+export function TasksMonitor() {
+  const [items, setItems] = useState<QueueItem[]>([]);
+  const isProcessingRef = useRef(false);
+
+  useEffect(() => {
+    setItems(loadQueueItems());
+  }, []);
+
+  useEffect(() => {
+    saveQueueItems(items);
+  }, [items]);
+
+  async function processItem(item: QueueItem, forcedThreadId?: string): Promise<void> {
+    const now = Date.now();
+    if (item.nextAttemptAt && new Date(item.nextAttemptAt).getTime() > now) {
+      return;
+    }
+
+    isProcessingRef.current = true;
+
+    try {
+      const response = await fetch("/api/payments/attempt", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          itemId: item.id,
+          vendor: item.vendor,
+          amountCents: item.amountCents,
+          invoiceId: item.invoiceId,
+          threadId: forcedThreadId ?? item.threadId,
+        }),
+      });
+
+      const payload = (await response.json()) as AttemptResponse | { error: string };
+      if (!response.ok && "error" in payload) {
+        throw new Error(payload.error);
+      }
+
+      const result = payload as AttemptResponse;
+      const retryAfterSeconds = result.retryAfterSeconds ?? 8;
+      const nextAttemptAt = new Date(Date.now() + retryAfterSeconds * 1000).toISOString();
+
+      setItems((current) =>
+        current.map((entry) => {
+          if (entry.id !== item.id) {
+            return entry;
+          }
+
+          const shouldRetry = ["awaiting_approval", "waiting_invoice", "payment_unverified"].includes(
+            result.status,
+          );
+
+          return {
+            ...entry,
+            threadId: result.threadId,
+            status: result.status,
+            retryAfterSeconds,
+            nextAttemptAt: shouldRetry ? nextAttemptAt : undefined,
+            payment: result.payment ?? entry.payment,
+            timeline: mergeTimeline(entry.timeline, result.timeline),
+            agentLogs: mergeLogs(entry.agentLogs, result.agentLogs),
+          };
+        }),
+      );
+    } catch (runError) {
+      setItems((current) =>
+        current.map((entry) =>
+          entry.id === item.id
+            ? {
+                ...entry,
+                status: "error",
+                timeline: [
+                  ...entry.timeline,
+                  runError instanceof Error ? runError.message : "Unknown queue execution failure",
+                ],
+              }
+            : entry,
+        ),
+      );
+    } finally {
+      isProcessingRef.current = false;
+    }
+  }
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (isProcessingRef.current) {
+        return;
+      }
+
+      const salaryDue = items.filter(
+        (item) => item.category === "salary" && isDueToday(item) && isDueNow(item) && canAutoProcess(item),
+      );
+
+      if (salaryDue.length > 0) {
+        const sharedThreadId =
+          salaryDue.find((item) => item.threadId)?.threadId ??
+          `salary-batch-${new Date().toISOString().slice(0, 10)}`;
+        void processItem(salaryDue[0], sharedThreadId);
+        return;
+      }
+
+      const next = items.find((item) => canAutoProcess(item) && isDueNow(item));
+      if (!next) {
+        return;
+      }
+
+      void processItem(next);
+    }, 6000);
+
+    return () => window.clearInterval(interval);
+  }, [items]);
+
+  const scheduledTasks = useMemo(
+    () => items.filter((item) => item.status !== "completed" && !isDueNow(item)),
+    [items],
+  );
+
+  const liveTasks = useMemo(
+    () => items.filter((item) => isLiveStatus(item) && isDueNow(item)),
+    [items],
+  );
+
+  const completedTasks = useMemo(
+    () => items.filter((item) => item.status === "completed"),
+    [items],
+  );
+
+  return (
+    <section className="relative overflow-hidden rounded-[2rem] border border-orange-100/20 bg-white/10 p-6 shadow-2xl backdrop-blur-2xl">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_8%,_rgba(251,146,60,.28),_transparent_40%)]" />
+      <div className="relative space-y-6">
+        <header className="space-y-1">
+          <p className="text-xs uppercase tracking-[0.18em] text-orange-100/85">Tasks</p>
+          <h2 className="text-3xl font-semibold text-white">Task Execution Console</h2>
+          <p className="text-sm text-white/75">Three task windows only: Scheduled, Live, and Finished.</p>
+        </header>
+
+        <section className="grid gap-4 xl:grid-cols-3">
+          <article className="rounded-2xl border border-orange-100/25 bg-black/25 p-4">
+            <h3 className="text-xl font-semibold text-white">Scheduled</h3>
+            <p className="mt-1 text-xs text-white/70">Tasks waiting for their date/time.</p>
+            <div className="mt-3 space-y-3">
+              {scheduledTasks.length === 0 && <p className="text-sm text-white/60">No scheduled tasks.</p>}
+              {scheduledTasks.map((item) => (
+                <div key={`${item.id}-scheduled`} className={`rounded-xl border p-3 text-sm ${statusTone[item.status]}`}>
+                  <p className="font-semibold text-white">{item.vendor} - ${(item.amountCents / 100).toFixed(2)}</p>
+                  <p className="text-xs text-white/70">Due: {new Date(item.dueAt).toLocaleString()}</p>
+                  <p className="text-xs text-white/70">{statusLabel[item.status]}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-orange-100/25 bg-black/25 p-4">
+            <h3 className="text-xl font-semibold text-white">Live</h3>
+            <p className="mt-1 text-xs text-white/70">Tasks actively processing with logs.</p>
+            <div className="mt-3 space-y-3">
+              {liveTasks.length === 0 && <p className="text-sm text-white/60">No live tasks.</p>}
+              {liveTasks.map((item) => (
+                <div key={`${item.id}-live`} className={`rounded-xl border p-3 text-sm ${statusTone[item.status]}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-semibold text-white">{item.vendor} - ${(item.amountCents / 100).toFixed(2)}</p>
+                    <p className="rounded-full border border-white/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-white/80">
+                      {statusLabel[item.status]}
+                    </p>
+                  </div>
+                  {item.payment?.stripeInvoiceUrl && (
+                    <a
+                      href={item.payment.stripeInvoiceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex text-xs text-orange-100 underline decoration-dotted underline-offset-4"
+                    >
+                      Open Stripe invoice proof
+                    </a>
+                  )}
+                  <div className="mt-2 rounded-lg border border-white/15 bg-black/30 p-2">
+                    <p className="text-xs font-medium uppercase tracking-[0.12em] text-orange-100/75">Logs</p>
+                    <ul className="mt-2 space-y-2 text-xs text-white/85">
+                      {item.agentLogs.slice(-6).map((entry, index) => (
+                        <li key={`${item.id}-log-${index}`} className="rounded-md bg-white/5 p-2">
+                          <p className="font-semibold">{entry.step}</p>
+                          <p className="text-white/60">{new Date(entry.at).toLocaleTimeString()}</p>
+                          <p>{entry.detail}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-orange-100/25 bg-black/25 p-4">
+            <h3 className="text-xl font-semibold text-white">Finished</h3>
+            <p className="mt-1 text-xs text-white/70">Completed payment tasks.</p>
+            <div className="mt-3 space-y-3">
+              {completedTasks.length === 0 && <p className="text-sm text-white/60">No finished tasks.</p>}
+              {completedTasks.map((item) => (
+                <div key={`${item.id}-finished`} className="rounded-xl border border-emerald-300/35 bg-emerald-300/10 p-3 text-sm">
+                  <p className="font-semibold text-white">{item.vendor} - ${(item.amountCents / 100).toFixed(2)}</p>
+                  <p className="text-xs text-white/75">Paid: ${((item.payment?.amountPaid ?? item.amountCents) / 100).toFixed(2)}</p>
+                  <p className="text-xs text-white/75">Completed status: {statusLabel[item.status]}</p>
+                  {item.payment?.stripeInvoiceUrl && (
+                    <a
+                      href={item.payment.stripeInvoiceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex text-xs text-emerald-100 underline decoration-dotted underline-offset-4"
+                    >
+                      Open Stripe invoice proof
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </article>
+        </section>
+      </div>
+    </section>
+  );
+}

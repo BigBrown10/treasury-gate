@@ -21,16 +21,24 @@ export default async function MainPage() {
           <TreasuryOverview snapshot={treasuryResult.snapshot} />
           <section className="rounded-[2rem] border border-white/20 bg-white/10 p-6 shadow-2xl backdrop-blur-2xl">
             <p className="text-xs uppercase tracking-[0.16em] text-white/65">Operations</p>
-            <h2 className="mt-2 text-2xl font-semibold text-white">Manage Scheduled and Live Tasks</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Create Items, Then Monitor Tasks</h2>
             <p className="mt-2 text-sm text-white/75">
-              Open the task workspace to create scheduled payments, monitor live logs, and review completed executions.
+              Use Items for creation and scheduling. Use Tasks for scheduled/live/finished execution status.
             </p>
-            <Link
-              href="/tasks"
-              className="mt-5 inline-flex items-center rounded-xl border border-cyan-200/50 bg-cyan-200/15 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-200/25"
-            >
-              View Tasks
-            </Link>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href="/items"
+                className="inline-flex items-center rounded-xl border border-orange-200/50 bg-orange-200/15 px-4 py-2 text-sm font-medium text-orange-100 transition hover:bg-orange-200/25"
+              >
+                Items
+              </Link>
+              <Link
+                href="/tasks"
+                className="inline-flex items-center rounded-xl border border-cyan-200/50 bg-cyan-200/15 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-200/25"
+              >
+                Tasks
+              </Link>
+            </div>
           </section>
         </div>
       </main>

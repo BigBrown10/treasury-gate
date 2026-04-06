@@ -22,7 +22,10 @@ export default function RootLayout({
               <Link href="/main" className="rounded-lg border border-white/15 px-3 py-1.5 transition hover:bg-white/10">
                 Get Started
               </Link>
-              <Link href="/tasks" className="rounded-lg border border-cyan-200/35 bg-cyan-200/10 px-3 py-1.5 text-cyan-100 transition hover:bg-cyan-200/20">
+              <Link href="/items" className="rounded-lg border border-orange-100/30 bg-orange-200/10 px-3 py-1.5 text-orange-100 transition hover:bg-orange-200/20">
+                Items
+              </Link>
+              <Link href="/tasks" className="rounded-lg border border-orange-100/30 bg-orange-200/10 px-3 py-1.5 text-orange-100 transition hover:bg-orange-200/20">
                 Tasks
               </Link>
             </div>
