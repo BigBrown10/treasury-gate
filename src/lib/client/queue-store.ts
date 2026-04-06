@@ -49,6 +49,10 @@ export type AttemptResponse = {
   threadId: string;
   status: QueueStatus;
   retryAfterSeconds?: number;
+  matchedInvoice?: {
+    id: string;
+    hostedInvoiceUrl?: string | null;
+  };
   timeline?: string[];
   agentLogs?: AgentLog[];
   payment?: QueueItem["payment"];

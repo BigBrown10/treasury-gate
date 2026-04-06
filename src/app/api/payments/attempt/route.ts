@@ -60,23 +60,43 @@ export async function POST(request: NextRequest) {
       ),
     );
 
-    if (input.requireInvoiceId && !input.invoiceId) {
-      return NextResponse.json({
-        itemId: input.itemId,
-        threadId,
-        status: "waiting_invoice",
-        retryAfterSeconds: DEFAULT_RETRY_SECONDS,
-        agentLogs: [...agentLogs, log("invoice_required", "Task requires explicit invoice id before payment")],
-        timeline: [
-          "Task is configured for auto-created invoice mode.",
-          "Waiting for a concrete invoice id before attempting payment.",
-        ],
+    let effectiveInvoiceId = input.invoiceId;
+    if (input.requireInvoiceId && !effectiveInvoiceId) {
+      const candidates = invoices.filter((invoice) => {
+        const amountMatch = invoice.amountDue === input.amountCents;
+        const vendorMatch = `${invoice.customerName ?? ""} ${invoice.description ?? ""}`
+          .toLowerCase()
+          .includes(input.vendor.toLowerCase());
+        return amountMatch && vendorMatch;
       });
+
+      if (candidates.length === 1) {
+        effectiveInvoiceId = candidates[0].id;
+        agentLogs.push(log("invoice_recovered", `Recovered invoice id ${effectiveInvoiceId} from open invoices`));
+      } else {
+        return NextResponse.json({
+          itemId: input.itemId,
+          threadId,
+          status: "waiting_invoice",
+          retryAfterSeconds: DEFAULT_RETRY_SECONDS,
+          agentLogs: [
+            ...agentLogs,
+            log(
+              "invoice_required",
+              `Task requires explicit invoice id before payment; recovery candidates=${candidates.length}`,
+            ),
+          ],
+          timeline: [
+            "Task is configured for auto-created invoice mode.",
+            "Waiting for a concrete invoice id before attempting payment.",
+          ],
+        });
+      }
     }
 
     let match = invoices.find((invoice) => {
-      if (input.invoiceId) {
-        return invoice.id === input.invoiceId;
+      if (effectiveInvoiceId) {
+        return invoice.id === effectiveInvoiceId;
       }
 
       const amountMatch = invoice.amountDue === input.amountCents;
@@ -86,8 +106,8 @@ export async function POST(request: NextRequest) {
       return amountMatch && vendorMatch;
     });
 
-    if (!match && input.invoiceId) {
-      const exactInvoice = await getInvoiceById(input.invoiceId);
+    if (!match && effectiveInvoiceId) {
+      const exactInvoice = await getInvoiceById(effectiveInvoiceId);
 
       if (exactInvoice.status === "paid") {
         const paidEvidence = await getInvoicePaymentEvidence(exactInvoice.id);
@@ -95,6 +115,10 @@ export async function POST(request: NextRequest) {
           itemId: input.itemId,
           threadId,
           status: "completed",
+          matchedInvoice: {
+            id: exactInvoice.id,
+            hostedInvoiceUrl: paidEvidence.hostedInvoiceUrl,
+          },
           payment: {
             status: paidEvidence.status,
             verifiedPaid: paidEvidence.verifiedPaid,
@@ -204,6 +228,10 @@ export async function POST(request: NextRequest) {
       itemId: input.itemId,
       threadId,
       status: evidence.verifiedPaid ? "completed" : "payment_unverified",
+      matchedInvoice: {
+        id: match.id,
+        hostedInvoiceUrl: evidence.hostedInvoiceUrl,
+      },
       payment: {
         status: evidence.status,
         verifiedPaid: evidence.verifiedPaid,

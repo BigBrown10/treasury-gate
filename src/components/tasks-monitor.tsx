@@ -79,6 +79,14 @@ function getApprovalState(item: QueueItem): {
   return { label: "Not Requested Yet", tone: "border-white/25 bg-white/5 text-white/80" };
 }
 
+function isReadyForAttempt(item: QueueItem): boolean {
+  if (!item.nextAttemptAt) {
+    return true;
+  }
+
+  return new Date(item.nextAttemptAt).getTime() <= Date.now();
+}
+
 export function TasksMonitor() {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [activePanel, setActivePanel] = useState<TaskPanel>(null);
@@ -185,6 +193,13 @@ export function TasksMonitor() {
               ...entry,
               threadId: result.threadId,
               status: result.status,
+              invoiceId: entry.invoiceId ?? result.matchedInvoice?.id,
+              invoiceUrl:
+                entry.invoiceUrl ??
+                result.matchedInvoice?.hostedInvoiceUrl ??
+                entry.payment?.receiptUrl ??
+                result.payment?.receiptUrl ??
+                undefined,
               retryAfterSeconds,
               nextAttemptAt: shouldRetry ? nextAttemptAt : undefined,
               payment: result.payment ?? entry.payment,
@@ -257,7 +272,12 @@ export function TasksMonitor() {
       }
 
       const salaryDue = items.filter(
-        (item) => item.category === "salary" && isDueToday(item) && isDueNow(item) && canAutoProcess(item),
+        (item) =>
+          item.category === "salary" &&
+          isDueToday(item) &&
+          isDueNow(item) &&
+          canAutoProcess(item) &&
+          isReadyForAttempt(item),
       );
 
       if (salaryDue.length > 0) {
@@ -268,7 +288,7 @@ export function TasksMonitor() {
         return;
       }
 
-      const next = items.find((item) => canAutoProcess(item) && isDueNow(item));
+      const next = items.find((item) => canAutoProcess(item) && isDueNow(item) && isReadyForAttempt(item));
       if (!next) {
         return;
       }
@@ -445,9 +465,23 @@ export function TasksMonitor() {
                       {getApprovalState(item).label}
                     </div>
                     <p className="mt-1 text-xs text-white/75">Due: {new Date(item.dueAt).toLocaleString()}</p>
+                    {item.nextAttemptAt && new Date(item.nextAttemptAt).getTime() > Date.now() && (
+                      <p className="text-xs text-white/75">Next retry: {new Date(item.nextAttemptAt).toLocaleString()}</p>
+                    )}
                     <p className="text-xs text-white/75">Recurrence: {item.recurrence === "monthly" ? "Monthly" : "One-time"}</p>
                     {item.recipientName && <p className="break-words text-xs text-white/75">Recipient: {item.recipientName}</p>}
                     {item.recipientEmail && <p className="break-words text-xs text-white/75">Recipient Email: {item.recipientEmail}</p>}
+                    {item.invoiceId && <p className="break-all text-xs text-white/75">Invoice ID: {item.invoiceId}</p>}
+
+                    {activePanel !== "finished" && canAutoProcess(item) && (
+                      <button
+                        type="button"
+                        onClick={() => void processItem(item)}
+                        className="mt-2 inline-flex rounded-full border border-orange-100/35 bg-orange-200/15 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-orange-100 transition hover:bg-orange-200/25"
+                      >
+                        Run Now
+                      </button>
+                    )}
 
                     {activePanel === "finished" && (
                       <p className="text-xs text-white/75">Paid: ${((item.payment?.amountPaid ?? item.amountCents) / 100).toFixed(2)}</p>
@@ -461,6 +495,28 @@ export function TasksMonitor() {
                         className="mt-2 inline-flex text-xs text-orange-100 underline decoration-dotted underline-offset-4"
                       >
                         Open Stripe invoice proof
+                      </a>
+                    )}
+
+                    {!item.payment?.stripeInvoiceUrl && item.invoiceUrl && (
+                      <a
+                        href={item.invoiceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex text-xs text-orange-100 underline decoration-dotted underline-offset-4"
+                      >
+                        Open Stripe hosted invoice
+                      </a>
+                    )}
+
+                    {!item.payment?.stripeInvoiceUrl && !item.invoiceUrl && item.invoiceId && (
+                      <a
+                        href={`https://dashboard.stripe.com/invoices/${item.invoiceId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex text-xs text-orange-100 underline decoration-dotted underline-offset-4"
+                      >
+                        Open Stripe invoice
                       </a>
                     )}
 
