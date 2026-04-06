@@ -129,6 +129,7 @@ export function TasksMonitor() {
           vendor: item.vendor,
           amountCents: item.amountCents,
           invoiceId,
+          requireInvoiceId: item.autoCreateInvoice,
           threadId: forcedThreadId ?? item.threadId,
         }),
       });

@@ -46,18 +46,22 @@ export async function POST(request: NextRequest) {
 
     const recentLogs = input.agentLogs.slice(-10).map((entry) => `${entry.at} | ${entry.step} | ${entry.detail}`).join("\n");
 
-    const response = await generateObject({
-      model: google("gemini-2.5-pro"),
-      schema: z.object({
-        title: z.string().min(1).max(80),
-        summary: z.string().min(1).max(360),
-        riskLevel: z.enum(["low", "medium", "high"]),
-        nextAction: z.string().min(1).max(160),
-      }),
-      prompt: `You are a finance operations reviewer.\nCreate a concise executive review.\nVendor: ${input.vendor}\nAmount: ${(input.amountCents / 100).toFixed(2)}\nStatus: ${input.status}\nDue: ${input.dueAt}\nPayment status: ${input.paymentStatus ?? "unknown"}\nPayment amount paid: ${(input.paymentAmountPaid ?? 0) / 100}\nRecent logs:\n${recentLogs}`,
-    });
+    try {
+      const response = await generateObject({
+        model: google("gemini-2.5-pro"),
+        schema: z.object({
+          title: z.string().min(1).max(80),
+          summary: z.string().min(1).max(360),
+          riskLevel: z.enum(["low", "medium", "high"]),
+          nextAction: z.string().min(1).max(160),
+        }),
+        prompt: `You are a finance operations reviewer.\nCreate a concise executive review.\nVendor: ${input.vendor}\nAmount: ${(input.amountCents / 100).toFixed(2)}\nStatus: ${input.status}\nDue: ${input.dueAt}\nPayment status: ${input.paymentStatus ?? "unknown"}\nPayment amount paid: ${(input.paymentAmountPaid ?? 0) / 100}\nRecent logs:\n${recentLogs}`,
+      });
 
-    return NextResponse.json({ review: response.object, source: "gemini" });
+      return NextResponse.json({ review: response.object, source: "gemini" });
+    } catch {
+      return NextResponse.json({ review: fallbackSummary(input), source: "fallback-model-error" });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to build AI review";
     return NextResponse.json({ error: message }, { status: 500 });

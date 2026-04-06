@@ -14,6 +14,7 @@ const schema = z.object({
   vendor: z.string().min(1),
   amountCents: z.number().int().positive(),
   invoiceId: z.string().optional(),
+  requireInvoiceId: z.boolean().optional(),
   threadId: z.string().optional(),
 });
 
@@ -58,6 +59,20 @@ export async function POST(request: NextRequest) {
         `available=${balance.available.toFixed(2)} ${balance.isoCurrencyCode}, openInvoices=${invoices.length}`,
       ),
     );
+
+    if (input.requireInvoiceId && !input.invoiceId) {
+      return NextResponse.json({
+        itemId: input.itemId,
+        threadId,
+        status: "waiting_invoice",
+        retryAfterSeconds: DEFAULT_RETRY_SECONDS,
+        agentLogs: [...agentLogs, log("invoice_required", "Task requires explicit invoice id before payment")],
+        timeline: [
+          "Task is configured for auto-created invoice mode.",
+          "Waiting for a concrete invoice id before attempting payment.",
+        ],
+      });
+    }
 
     let match = invoices.find((invoice) => {
       if (input.invoiceId) {
