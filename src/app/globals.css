@@ -70,3 +70,30 @@ body {
 .hero-pulse-delay {
   animation: heroPulse 6.5s ease-in-out 0.7s infinite;
 }
+
+@keyframes modalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(16px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+.modal-pop {
+  animation: modalPop 0.24s ease-out both;
+}
+
+.story-card {
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.story-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 210, 178, 0.42);
+  box-shadow: 0 18px 48px rgba(255, 112, 64, 0.16);
+}

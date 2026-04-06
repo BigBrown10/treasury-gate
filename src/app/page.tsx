@@ -66,6 +66,42 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <section className="relative mx-auto mt-20 w-full max-w-[1400px]">
+        <div className="mb-8 max-w-3xl">
+          <p className="text-xs uppercase tracking-[0.2em] text-orange-100/80">How It Flows</p>
+          <h2 className="mt-2 text-3xl font-semibold text-white sm:text-4xl">A smooth path from intent to proof.</h2>
+          <p className="mt-2 text-sm text-orange-50/80 sm:text-base">
+            Scroll through the story: schedule when money should move, approve only what should pass, verify every completed payment.
+          </p>
+        </div>
+
+        <div className="space-y-12 pb-8 sm:space-y-16">
+          <article className="story-card sticky top-24 rounded-3xl border border-orange-100/20 bg-black/35 p-6 backdrop-blur-2xl sm:p-8">
+            <p className="text-xs uppercase tracking-[0.18em] text-orange-100/75">01 - Schedule</p>
+            <h3 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Set the exact date and time.</h3>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-orange-50/85 sm:text-base">
+              Create items with real amounts, vendor details, and due time. TreasuryGate lines everything up before execution starts.
+            </p>
+          </article>
+
+          <article className="story-card sticky top-28 rounded-3xl border border-orange-100/20 bg-black/35 p-6 backdrop-blur-2xl sm:p-8">
+            <p className="text-xs uppercase tracking-[0.18em] text-orange-100/75">02 - Approve</p>
+            <h3 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Keep humans in control.</h3>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-orange-50/85 sm:text-base">
+              Before money moves, Auth0 approval gates the action. The system automates the process, not your authority.
+            </p>
+          </article>
+
+          <article className="story-card sticky top-32 rounded-3xl border border-orange-100/20 bg-black/35 p-6 backdrop-blur-2xl sm:p-8">
+            <p className="text-xs uppercase tracking-[0.18em] text-orange-100/75">03 - Verify</p>
+            <h3 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Close with evidence.</h3>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-orange-50/85 sm:text-base">
+              Live logs and Stripe proof links show what happened, when it happened, and how each task reached completion.
+            </p>
+          </article>
+        </div>
+      </section>
     </main>
   );
 }

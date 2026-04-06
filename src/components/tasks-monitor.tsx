@@ -17,8 +17,11 @@ import {
   statusTone,
 } from "@/lib/client/queue-store";
 
+type TaskPanel = "scheduled" | "live" | "finished" | null;
+
 export function TasksMonitor() {
   const [items, setItems] = useState<QueueItem[]>([]);
+  const [activePanel, setActivePanel] = useState<TaskPanel>(null);
   const isProcessingRef = useRef(false);
 
   useEffect(() => {
@@ -147,97 +150,129 @@ export function TasksMonitor() {
     [items],
   );
 
+  const modalItems =
+    activePanel === "scheduled"
+      ? scheduledTasks
+      : activePanel === "live"
+        ? liveTasks
+        : activePanel === "finished"
+          ? completedTasks
+          : [];
+
   return (
     <section className="relative overflow-hidden rounded-[2rem] border border-orange-100/20 bg-white/10 p-6 shadow-2xl backdrop-blur-2xl">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_8%,_rgba(251,146,60,.28),_transparent_40%)]" />
       <div className="relative space-y-6">
         <header className="space-y-1">
           <p className="text-xs uppercase tracking-[0.18em] text-orange-100/85">Tasks</p>
-          <h2 className="text-3xl font-semibold text-white">Task Execution Console</h2>
-          <p className="text-sm text-white/75">Three task windows only: Scheduled, Live, and Finished.</p>
+          <h2 className="text-3xl font-semibold text-white">Task Modal Console</h2>
+          <p className="text-sm text-white/75">Open each panel as a popup modal: Scheduled, Live, and Finished.</p>
         </header>
 
-        <section className="grid gap-4 xl:grid-cols-3">
-          <article className="rounded-2xl border border-orange-100/25 bg-black/25 p-4">
-            <h3 className="text-xl font-semibold text-white">Scheduled</h3>
-            <p className="mt-1 text-xs text-white/70">Tasks waiting for their date/time.</p>
-            <div className="mt-3 space-y-3">
-              {scheduledTasks.length === 0 && <p className="text-sm text-white/60">No scheduled tasks.</p>}
-              {scheduledTasks.map((item) => (
-                <div key={`${item.id}-scheduled`} className={`rounded-xl border p-3 text-sm ${statusTone[item.status]}`}>
-                  <p className="font-semibold text-white">{item.vendor} - ${(item.amountCents / 100).toFixed(2)}</p>
-                  <p className="text-xs text-white/70">Due: {new Date(item.dueAt).toLocaleString()}</p>
-                  <p className="text-xs text-white/70">{statusLabel[item.status]}</p>
-                </div>
-              ))}
-            </div>
-          </article>
+        <section className="grid gap-4 md:grid-cols-3">
+          <button
+            type="button"
+            onClick={() => setActivePanel("scheduled")}
+            className="rounded-2xl border border-orange-100/25 bg-black/25 p-5 text-left transition hover:scale-[1.01] hover:border-orange-100/40"
+          >
+            <p className="text-xs uppercase tracking-[0.14em] text-orange-100/75">Modal 01</p>
+            <h3 className="mt-2 text-2xl font-semibold text-white">Scheduled</h3>
+            <p className="mt-1 text-sm text-white/75">Tasks waiting for date/time trigger.</p>
+            <p className="mt-4 text-3xl font-semibold text-orange-100">{scheduledTasks.length}</p>
+          </button>
 
-          <article className="rounded-2xl border border-orange-100/25 bg-black/25 p-4">
-            <h3 className="text-xl font-semibold text-white">Live</h3>
-            <p className="mt-1 text-xs text-white/70">Tasks actively processing with logs.</p>
-            <div className="mt-3 space-y-3">
-              {liveTasks.length === 0 && <p className="text-sm text-white/60">No live tasks.</p>}
-              {liveTasks.map((item) => (
-                <div key={`${item.id}-live`} className={`rounded-xl border p-3 text-sm ${statusTone[item.status]}`}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-semibold text-white">{item.vendor} - ${(item.amountCents / 100).toFixed(2)}</p>
-                    <p className="rounded-full border border-white/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-white/80">
-                      {statusLabel[item.status]}
-                    </p>
-                  </div>
-                  {item.payment?.stripeInvoiceUrl && (
-                    <a
-                      href={item.payment.stripeInvoiceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-2 inline-flex text-xs text-orange-100 underline decoration-dotted underline-offset-4"
-                    >
-                      Open Stripe invoice proof
-                    </a>
-                  )}
-                  <div className="mt-2 rounded-lg border border-white/15 bg-black/30 p-2">
-                    <p className="text-xs font-medium uppercase tracking-[0.12em] text-orange-100/75">Logs</p>
-                    <ul className="mt-2 space-y-2 text-xs text-white/85">
-                      {item.agentLogs.slice(-6).map((entry, index) => (
-                        <li key={`${item.id}-log-${index}`} className="rounded-md bg-white/5 p-2">
-                          <p className="font-semibold">{entry.step}</p>
-                          <p className="text-white/60">{new Date(entry.at).toLocaleTimeString()}</p>
-                          <p>{entry.detail}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </article>
+          <button
+            type="button"
+            onClick={() => setActivePanel("live")}
+            className="rounded-2xl border border-orange-100/25 bg-black/25 p-5 text-left transition hover:scale-[1.01] hover:border-orange-100/40"
+          >
+            <p className="text-xs uppercase tracking-[0.14em] text-orange-100/75">Modal 02</p>
+            <h3 className="mt-2 text-2xl font-semibold text-white">Live</h3>
+            <p className="mt-1 text-sm text-white/75">Tasks currently running with logs.</p>
+            <p className="mt-4 text-3xl font-semibold text-orange-100">{liveTasks.length}</p>
+          </button>
 
-          <article className="rounded-2xl border border-orange-100/25 bg-black/25 p-4">
-            <h3 className="text-xl font-semibold text-white">Finished</h3>
-            <p className="mt-1 text-xs text-white/70">Completed payment tasks.</p>
-            <div className="mt-3 space-y-3">
-              {completedTasks.length === 0 && <p className="text-sm text-white/60">No finished tasks.</p>}
-              {completedTasks.map((item) => (
-                <div key={`${item.id}-finished`} className="rounded-xl border border-emerald-300/35 bg-emerald-300/10 p-3 text-sm">
-                  <p className="font-semibold text-white">{item.vendor} - ${(item.amountCents / 100).toFixed(2)}</p>
-                  <p className="text-xs text-white/75">Paid: ${((item.payment?.amountPaid ?? item.amountCents) / 100).toFixed(2)}</p>
-                  <p className="text-xs text-white/75">Completed status: {statusLabel[item.status]}</p>
-                  {item.payment?.stripeInvoiceUrl && (
-                    <a
-                      href={item.payment.stripeInvoiceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-2 inline-flex text-xs text-emerald-100 underline decoration-dotted underline-offset-4"
-                    >
-                      Open Stripe invoice proof
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
-          </article>
+          <button
+            type="button"
+            onClick={() => setActivePanel("finished")}
+            className="rounded-2xl border border-orange-100/25 bg-black/25 p-5 text-left transition hover:scale-[1.01] hover:border-orange-100/40"
+          >
+            <p className="text-xs uppercase tracking-[0.14em] text-orange-100/75">Modal 03</p>
+            <h3 className="mt-2 text-2xl font-semibold text-white">Finished</h3>
+            <p className="mt-1 text-sm text-white/75">Completed tasks with payment proof.</p>
+            <p className="mt-4 text-3xl font-semibold text-orange-100">{completedTasks.length}</p>
+          </button>
         </section>
+
+        {activePanel && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-8 backdrop-blur-sm" onClick={() => setActivePanel(null)}>
+            <article
+              className="modal-pop relative max-h-[85vh] w-full max-w-4xl overflow-auto rounded-3xl border border-orange-100/30 bg-gradient-to-b from-[#211011] to-[#160d15] p-6 shadow-[0_0_80px_rgba(255,110,70,.25)]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.14em] text-orange-100/75">Task Window</p>
+                  <h3 className="mt-1 text-3xl font-semibold text-white">
+                    {activePanel === "scheduled" ? "Scheduled" : activePanel === "live" ? "Live" : "Finished"}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActivePanel(null)}
+                  className="rounded-xl border border-orange-100/30 bg-white/5 px-3 py-1.5 text-xs uppercase tracking-[0.12em] text-orange-100 transition hover:bg-white/10"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {modalItems.length === 0 && <p className="text-sm text-white/65">No tasks in this modal.</p>}
+                {modalItems.map((item) => (
+                  <div key={`${item.id}-${activePanel}`} className={`rounded-2xl border p-4 text-sm ${statusTone[item.status]}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-semibold text-white">{item.vendor} - ${(item.amountCents / 100).toFixed(2)}</p>
+                      <p className="rounded-full border border-white/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-white/85">
+                        {statusLabel[item.status]}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-xs text-white/75">Due: {new Date(item.dueAt).toLocaleString()}</p>
+
+                    {activePanel === "finished" && (
+                      <p className="text-xs text-white/75">Paid: ${((item.payment?.amountPaid ?? item.amountCents) / 100).toFixed(2)}</p>
+                    )}
+
+                    {item.payment?.stripeInvoiceUrl && (
+                      <a
+                        href={item.payment.stripeInvoiceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex text-xs text-orange-100 underline decoration-dotted underline-offset-4"
+                      >
+                        Open Stripe invoice proof
+                      </a>
+                    )}
+
+                    {activePanel === "live" && (
+                      <div className="mt-3 rounded-xl border border-white/15 bg-black/30 p-3">
+                        <p className="text-xs uppercase tracking-[0.12em] text-orange-100/80">Latest Logs</p>
+                        <ul className="mt-2 space-y-2 text-xs text-white/85">
+                          {item.agentLogs.slice(-8).map((entry, index) => (
+                            <li key={`${item.id}-log-${index}`} className="rounded-md bg-white/5 p-2">
+                              <p className="font-semibold">{entry.step}</p>
+                              <p className="text-white/60">{new Date(entry.at).toLocaleTimeString()}</p>
+                              <p>{entry.detail}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </article>
+          </div>
+        )}
       </div>
     </section>
   );
