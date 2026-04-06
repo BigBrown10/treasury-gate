@@ -9,10 +9,10 @@ export default function ItemsPage() {
 
       <div className="relative mx-auto w-full max-w-[1400px] space-y-4">
         <header className="rounded-3xl border border-orange-100/20 bg-white/10 p-5 shadow-xl backdrop-blur-2xl">
-          <p className="text-xs uppercase tracking-[0.16em] text-orange-100/80">Items</p>
-          <h1 className="mt-1 text-3xl font-semibold text-white">Create and Schedule Items</h1>
+          <p className="text-xs uppercase tracking-[0.16em] text-orange-100/80">Create New</p>
+          <h1 className="mt-1 text-3xl font-semibold text-white">Create and Schedule New Payments</h1>
           <p className="mt-2 text-sm text-white/75">
-            This page is only for item creation and scheduling. Execution logs are in the Tasks page.
+            This page is only for new payment creation and scheduling. Execution review is in Tasks.
           </p>
         </header>
 

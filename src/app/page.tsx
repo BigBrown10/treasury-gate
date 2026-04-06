@@ -2,104 +2,96 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="relative min-h-screen overflow-hidden px-4 py-10 sm:px-8 sm:py-16">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(255,121,56,.45),transparent_35%),radial-gradient(circle_at_72%_32%,rgba(255,84,47,.28),transparent_42%),radial-gradient(circle_at_50%_80%,rgba(255,157,98,.22),transparent_42%),linear-gradient(140deg,#1b0807_0%,#12060e_44%,#090812_100%)]" />
-
-      <div className="hero-pulse pointer-events-none absolute -left-20 top-32 h-72 w-72 rounded-full bg-[#ff6a3f]/35 blur-3xl" />
-      <div className="hero-pulse-delay pointer-events-none absolute -right-20 top-40 h-80 w-80 rounded-full bg-[#ff9b63]/25 blur-3xl" />
-
-      <section className="relative mx-auto grid w-full max-w-[1400px] items-center gap-10 lg:grid-cols-[1fr,0.9fr]">
-        <div className="space-y-7">
-          <p className="hero-reveal text-xs uppercase tracking-[0.22em] text-orange-100/85">Autonomous Treasury Control</p>
-
-          <h1 className="max-w-3xl text-5xl font-semibold leading-[1.02] text-white sm:text-6xl lg:text-7xl">
-            <span className="hero-reveal block">Finance Ops That</span>
-            <span className="hero-reveal-delay-1 block text-orange-200">Move On Time.</span>
-            <span className="hero-reveal-delay-2 block">With Approval Built In.</span>
-          </h1>
-
-          <p className="hero-reveal-delay-2 max-w-2xl text-lg leading-relaxed text-orange-50/85 sm:text-xl">
-            TreasuryGate schedules payables, checks liquidity, requests secure approval, and executes real Stripe payments with proof. You stay in control while the workflow keeps moving.
-          </p>
-
-          <div className="hero-reveal-delay-3 flex flex-wrap items-center gap-3">
-            <Link
-              href="/main"
-              className="rounded-xl border border-orange-200/60 bg-gradient-to-r from-[#ff6b3f] via-[#ff7f4d] to-[#ff9a61] px-6 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white shadow-[0_0_45px_rgba(255,122,80,.38)] transition hover:scale-[1.02] hover:shadow-[0_0_55px_rgba(255,133,84,.5)]"
-            >
-              Get Started
-            </Link>
-            <Link
-              href="/tasks"
-              className="rounded-xl border border-orange-100/35 bg-white/5 px-6 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-orange-100 transition hover:bg-white/12"
-            >
-              View Tasks
-            </Link>
-          </div>
-
-          <div className="hero-reveal-delay-3 grid max-w-2xl gap-3 sm:grid-cols-3">
-            <article className="rounded-2xl border border-white/15 bg-black/25 p-4 backdrop-blur-xl">
-              <p className="text-xs uppercase tracking-[0.13em] text-orange-100/75">Schedule</p>
-              <p className="mt-1 text-sm text-white/90">Set exact date and time for each payment task.</p>
-            </article>
-            <article className="rounded-2xl border border-white/15 bg-black/25 p-4 backdrop-blur-xl">
-              <p className="text-xs uppercase tracking-[0.13em] text-orange-100/75">Authorize</p>
-              <p className="mt-1 text-sm text-white/90">Auth0 approval gates every payment action.</p>
-            </article>
-            <article className="rounded-2xl border border-white/15 bg-black/25 p-4 backdrop-blur-xl">
-              <p className="text-xs uppercase tracking-[0.13em] text-orange-100/75">Verify</p>
-              <p className="mt-1 text-sm text-white/90">Stripe evidence and logs track completed outcomes.</p>
-            </article>
-          </div>
-        </div>
-
-        <div className="hero-reveal-delay-2 relative min-h-[420px] rounded-[2.25rem] border border-orange-200/25 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-5 backdrop-blur-2xl sm:min-h-[500px]">
-          <div className="absolute left-6 top-6 h-2 w-2 rounded-full bg-orange-300 shadow-[0_0_18px_rgba(255,174,112,1)]" />
-          <div className="absolute right-10 top-14 h-32 w-32 rotate-12 rounded-[1.8rem] border border-orange-200/35 bg-gradient-to-b from-[#ffb581] via-[#ff7d47] to-[#74201e] opacity-80 shadow-[0_0_70px_rgba(255,109,66,.45)]" />
-          <div className="absolute bottom-16 right-6 h-52 w-28 -rotate-6 rounded-[1.6rem] border border-orange-100/30 bg-gradient-to-b from-[#ffd0a3] via-[#ff8a52] to-[#8f2a24] shadow-[0_0_90px_rgba(255,98,58,.35)]" />
-          <div className="absolute bottom-8 left-6 right-6 rounded-2xl border border-orange-100/20 bg-black/40 p-4">
-            <p className="text-xs uppercase tracking-[0.12em] text-orange-100/70">Live Operations</p>
-            <p className="mt-1 text-xl font-semibold text-white">From Scheduled to Paid</p>
-            <p className="mt-2 text-sm text-orange-50/80">
-              Queue tasks by date, watch approvals in progress, and close execution with auditable payment proof.
+    <main className="min-h-screen bg-[#15090c] text-[#fff4ea]">
+      <section className="dot-pattern border-b-2 border-[#f7a36f] bg-[#2a0f0d] px-4 py-14 sm:px-8 sm:py-20">
+        <div className="mx-auto grid w-full max-w-[1400px] gap-10 lg:grid-cols-[1fr,0.95fr]">
+          <div className="space-y-7">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#ffc8a8]">Autonomous Treasury Control</p>
+            <h1 className="text-5xl font-semibold leading-[0.98] text-white sm:text-7xl">
+              Schedule Spend.
+              <br />
+              <span className="text-[#ffb081]">Approve Fast.</span>
+              <br />
+              Verify Every Dollar.
+            </h1>
+            <p className="max-w-2xl text-lg leading-relaxed text-[#ffd8c0] sm:text-xl">
+              TreasuryGate is your command center for payable execution: create new payment requests, enforce approval gates, and close with proof your finance team can trust.
             </p>
+
+            <div className="flex flex-wrap gap-3">
+              <Link href="/items" className="brand-push-btn px-6 py-3 text-sm font-semibold uppercase tracking-[0.08em]">
+                Get Started
+              </Link>
+              <Link href="/tasks" className="brand-push-btn-ghost px-6 py-3 text-sm font-semibold uppercase tracking-[0.08em]">
+                Tasks
+              </Link>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border-2 border-[#f7a36f] bg-[#211013] p-4 shadow-[8px_8px_0_0_#1b090b] sm:p-6">
+            <div className="rounded-xl border-2 border-[#f7a36f] bg-[#180c0f] p-4">
+              <p className="text-xs uppercase tracking-[0.12em] text-[#ffc8a8]">Live Operations Snapshot</p>
+              <p className="mt-2 text-2xl font-semibold text-white">From Create New to Cleared Payment</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <article className="rounded-lg border-2 border-[#f7a36f] bg-[#2a1214] p-3">
+                  <p className="text-xs uppercase tracking-[0.12em] text-[#ffc8a8]">Schedule</p>
+                  <p className="mt-1 text-sm text-[#ffe4d1]">Exact due date and time</p>
+                </article>
+                <article className="rounded-lg border-2 border-[#f7a36f] bg-[#2a1214] p-3">
+                  <p className="text-xs uppercase tracking-[0.12em] text-[#ffc8a8]">Approve</p>
+                  <p className="mt-1 text-sm text-[#ffe4d1]">Auth0 guarded execution</p>
+                </article>
+                <article className="rounded-lg border-2 border-[#f7a36f] bg-[#2a1214] p-3">
+                  <p className="text-xs uppercase tracking-[0.12em] text-[#ffc8a8]">Verify</p>
+                  <p className="mt-1 text-sm text-[#ffe4d1]">Stripe evidence links</p>
+                </article>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="relative mx-auto mt-20 w-full max-w-[1400px]">
-        <div className="mb-8 max-w-3xl">
-          <p className="text-xs uppercase tracking-[0.2em] text-orange-100/80">How It Flows</p>
-          <h2 className="mt-2 text-3xl font-semibold text-white sm:text-4xl">A smooth path from intent to proof.</h2>
-          <p className="mt-2 text-sm text-orange-50/80 sm:text-base">
-            Scroll through the story: schedule when money should move, approve only what should pass, verify every completed payment.
-          </p>
+      <section className="border-b-2 border-[#f7a36f] bg-[#13070a] px-4 py-8 sm:px-8">
+        <div className="marquee-track mx-auto flex w-full max-w-[1400px] gap-10 overflow-hidden text-sm uppercase tracking-[0.16em] text-[#f7a36f]/70">
+          <span>Create New</span>
+          <span>Liquidity Check</span>
+          <span>Auth0 Approval</span>
+          <span>Stripe Execution</span>
+          <span>AI Task Review</span>
+          <span>Evidence-Backed Close</span>
+          <span>Create New</span>
+          <span>Liquidity Check</span>
+          <span>Auth0 Approval</span>
+          <span>Stripe Execution</span>
         </div>
+      </section>
 
-        <div className="space-y-12 pb-8 sm:space-y-16">
-          <article className="story-card sticky top-24 rounded-3xl border border-orange-100/20 bg-black/35 p-6 backdrop-blur-2xl sm:p-8">
-            <p className="text-xs uppercase tracking-[0.18em] text-orange-100/75">01 - Schedule</p>
-            <h3 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Set the exact date and time.</h3>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-orange-50/85 sm:text-base">
-              Create items with real amounts, vendor details, and due time. TreasuryGate lines everything up before execution starts.
-            </p>
-          </article>
+      <section className="bg-[#15090c] px-4 py-14 sm:px-8">
+        <div className="mx-auto w-full max-w-[1400px] space-y-7">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[#ffc8a8]">How It Flows</p>
+            <h2 className="mt-2 text-4xl font-semibold text-white">Schedule. Approve. Verify.</h2>
+          </div>
 
-          <article className="story-card sticky top-28 rounded-3xl border border-orange-100/20 bg-black/35 p-6 backdrop-blur-2xl sm:p-8">
-            <p className="text-xs uppercase tracking-[0.18em] text-orange-100/75">02 - Approve</p>
-            <h3 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Keep humans in control.</h3>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-orange-50/85 sm:text-base">
-              Before money moves, Auth0 approval gates the action. The system automates the process, not your authority.
-            </p>
-          </article>
+          <div className="space-y-6">
+            <article className="story-card sticky top-24 rounded-2xl border-2 border-[#f7a36f] bg-[#1f0f11] p-6 shadow-[6px_6px_0_0_#1b090b] sm:p-8">
+              <p className="text-xs uppercase tracking-[0.16em] text-[#ffc8a8]">01 - Schedule</p>
+              <h3 className="mt-2 text-3xl font-semibold text-white">Define when money should move.</h3>
+              <p className="mt-2 text-base text-[#ffe4d1]">Create new payment tasks with exact amounts, categories, and date-time precision.</p>
+            </article>
 
-          <article className="story-card sticky top-32 rounded-3xl border border-orange-100/20 bg-black/35 p-6 backdrop-blur-2xl sm:p-8">
-            <p className="text-xs uppercase tracking-[0.18em] text-orange-100/75">03 - Verify</p>
-            <h3 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Close with evidence.</h3>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-orange-50/85 sm:text-base">
-              Live logs and Stripe proof links show what happened, when it happened, and how each task reached completion.
-            </p>
-          </article>
+            <article className="story-card sticky top-28 rounded-2xl border-2 border-[#f7a36f] bg-[#1f0f11] p-6 shadow-[6px_6px_0_0_#1b090b] sm:p-8">
+              <p className="text-xs uppercase tracking-[0.16em] text-[#ffc8a8]">02 - Approve</p>
+              <h3 className="mt-2 text-3xl font-semibold text-white">Move quickly, stay controlled.</h3>
+              <p className="mt-2 text-base text-[#ffe4d1]">Auth0 async approval keeps humans in charge before any payment mutates state.</p>
+            </article>
+
+            <article className="story-card sticky top-32 rounded-2xl border-2 border-[#f7a36f] bg-[#1f0f11] p-6 shadow-[6px_6px_0_0_#1b090b] sm:p-8">
+              <p className="text-xs uppercase tracking-[0.16em] text-[#ffc8a8]">03 - Verify</p>
+              <h3 className="mt-2 text-3xl font-semibold text-white">Close with evidence, not guesswork.</h3>
+              <p className="mt-2 text-base text-[#ffe4d1]">Stripe invoice proof and AI-generated task reviews explain exactly what happened and what to do next.</p>
+            </article>
+          </div>
         </div>
       </section>
     </main>

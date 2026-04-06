@@ -19,9 +19,18 @@ import {
 
 type TaskPanel = "scheduled" | "live" | "finished" | null;
 
+type AiReview = {
+  title: string;
+  summary: string;
+  riskLevel: "low" | "medium" | "high";
+  nextAction: string;
+};
+
 export function TasksMonitor() {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [activePanel, setActivePanel] = useState<TaskPanel>(null);
+  const [reviewsByItemId, setReviewsByItemId] = useState<Record<string, AiReview>>({});
+  const [reviewLoading, setReviewLoading] = useState<Record<string, boolean>>({});
   const isProcessingRef = useRef(false);
 
   useEffect(() => {
@@ -159,6 +168,59 @@ export function TasksMonitor() {
           ? completedTasks
           : [];
 
+  useEffect(() => {
+    if (activePanel !== "live") {
+      return;
+    }
+
+    const targets = liveTasks.filter((item) => !reviewsByItemId[item.id] && !reviewLoading[item.id]);
+    if (targets.length === 0) {
+      return;
+    }
+
+    for (const item of targets.slice(0, 3)) {
+      setReviewLoading((current) => ({ ...current, [item.id]: true }));
+
+      void fetch("/api/tasks/review", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          vendor: item.vendor,
+          amountCents: item.amountCents,
+          status: item.status,
+          dueAt: item.dueAt,
+          paymentStatus: item.payment?.status,
+          paymentAmountPaid: item.payment?.amountPaid,
+          agentLogs: item.agentLogs,
+        }),
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error("Failed to fetch AI review");
+          }
+
+          const payload = (await response.json()) as { review: AiReview };
+          setReviewsByItemId((current) => ({ ...current, [item.id]: payload.review }));
+        })
+        .catch(() => {
+          setReviewsByItemId((current) => ({
+            ...current,
+            [item.id]: {
+              title: "Review unavailable",
+              summary: "AI review could not be generated right now.",
+              riskLevel: "medium",
+              nextAction: "Use task status and payment evidence link to continue review.",
+            },
+          }));
+        })
+        .finally(() => {
+          setReviewLoading((current) => ({ ...current, [item.id]: false }));
+        });
+    }
+  }, [activePanel, liveTasks, reviewsByItemId, reviewLoading]);
+
   return (
     <section className="relative overflow-hidden rounded-[2rem] border border-orange-100/20 bg-white/10 p-6 shadow-2xl backdrop-blur-2xl">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_8%,_rgba(251,146,60,.28),_transparent_40%)]" />
@@ -188,7 +250,7 @@ export function TasksMonitor() {
           >
             <p className="text-xs uppercase tracking-[0.14em] text-orange-100/75">Modal 02</p>
             <h3 className="mt-2 text-2xl font-semibold text-white">Live</h3>
-            <p className="mt-1 text-sm text-white/75">Tasks currently running with logs.</p>
+            <p className="mt-1 text-sm text-white/75">Tasks currently running with AI reviews.</p>
             <p className="mt-4 text-3xl font-semibold text-orange-100">{liveTasks.length}</p>
           </button>
 
@@ -255,16 +317,18 @@ export function TasksMonitor() {
 
                     {activePanel === "live" && (
                       <div className="mt-3 rounded-xl border border-white/15 bg-black/30 p-3">
-                        <p className="text-xs uppercase tracking-[0.12em] text-orange-100/80">Latest Logs</p>
-                        <ul className="mt-2 space-y-2 text-xs text-white/85">
-                          {item.agentLogs.slice(-8).map((entry, index) => (
-                            <li key={`${item.id}-log-${index}`} className="rounded-md bg-white/5 p-2">
-                              <p className="font-semibold">{entry.step}</p>
-                              <p className="text-white/60">{new Date(entry.at).toLocaleTimeString()}</p>
-                              <p>{entry.detail}</p>
-                            </li>
-                          ))}
-                        </ul>
+                        <p className="text-xs uppercase tracking-[0.12em] text-orange-100/80">AI Review Summary</p>
+                        {reviewLoading[item.id] && <p className="mt-2 text-xs text-white/75">Generating summary...</p>}
+                        {!reviewLoading[item.id] && reviewsByItemId[item.id] && (
+                          <div className="mt-2 rounded-lg bg-white/5 p-3 text-xs text-white/85">
+                            <p className="font-semibold text-white">{reviewsByItemId[item.id].title}</p>
+                            <p className="mt-1">{reviewsByItemId[item.id].summary}</p>
+                            <p className="mt-2 uppercase tracking-[0.1em] text-orange-100/80">
+                              Risk: {reviewsByItemId[item.id].riskLevel}
+                            </p>
+                            <p className="mt-1 text-white/75">Next: {reviewsByItemId[item.id].nextAction}</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

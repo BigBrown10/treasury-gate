@@ -31,11 +31,12 @@ function log(step: string, detail: string): AgentLog {
 
 export async function POST(request: NextRequest) {
   const userId = request.headers.get("x-user-id") ?? "demo-user";
+  let threadId = crypto.randomUUID();
 
   try {
     const body = await request.json();
     const input = schema.parse(body);
-    const threadId = input.threadId ?? crypto.randomUUID();
+    threadId = input.threadId ?? crypto.randomUUID();
     const agentLogs: AgentLog[] = [log("request_received", `item=${input.itemId}, thread=${threadId}`)];
 
     const [balance, invoices] = await Promise.all([
@@ -178,6 +179,7 @@ export async function POST(request: NextRequest) {
     if (mapped) {
       return NextResponse.json(
         {
+          threadId,
           status: mapped.status,
           timeline: [mapped.message],
           retryAfterSeconds: mapped.retryAfterSeconds,

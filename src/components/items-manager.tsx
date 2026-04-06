@@ -133,10 +133,10 @@ export function ItemsManager() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,_rgba(251,146,60,.28),_transparent_42%)]" />
       <div className="relative space-y-5">
         <header className="space-y-1">
-          <p className="text-xs uppercase tracking-[0.18em] text-orange-100/85">Items</p>
-          <h2 className="text-3xl font-semibold text-white">Create Payment Items</h2>
+          <p className="text-xs uppercase tracking-[0.18em] text-orange-100/85">Create New</p>
+          <h2 className="text-3xl font-semibold text-white">Create New Payment</h2>
           <p className="text-sm text-white/75">
-            Add items with specific date and time. Execution happens in the Tasks page.
+            Add a new payment with specific date and time. Execution happens in the Tasks page.
           </p>
         </header>
 
@@ -207,7 +207,7 @@ export function ItemsManager() {
             disabled={isAdding}
             className="col-span-full inline-flex w-fit items-center justify-center rounded-xl border border-orange-200/60 bg-orange-300/20 px-4 py-2 text-sm font-medium text-orange-50 transition hover:bg-orange-300/30 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isAdding ? "Adding item..." : "Add item"}
+            {isAdding ? "Creating..." : "Create New"}
           </button>
 
           {error && (
@@ -218,8 +218,8 @@ export function ItemsManager() {
         </form>
 
         <section className="space-y-3">
-          <h3 className="text-lg font-semibold text-white">Recent Items</h3>
-          {items.length === 0 && <p className="text-sm text-white/70">No items created yet.</p>}
+          <h3 className="text-lg font-semibold text-white">Recent Created</h3>
+          {items.length === 0 && <p className="text-sm text-white/70">No payment requests created yet.</p>}
           {items.slice(0, 8).map((item) => (
             <article key={item.id} className={`rounded-2xl border p-4 text-sm text-white/90 ${statusTone[item.status]}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">

@@ -19,6 +19,62 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+.brand-logo {
+  font-family: "Segoe UI Variable Display", "Avenir Next", "Trebuchet MS", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ffd2b2;
+}
+
+.brand-nav-btn {
+  border: 2px solid #f7a36f;
+  background: #2a1214;
+  color: #ffd7bf;
+  border-radius: 0.7rem;
+  padding: 0.35rem 0.8rem;
+  box-shadow: 4px 4px 0 0 #1b090b;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.brand-nav-btn:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 0 #1b090b;
+  background: #3b1616;
+}
+
+.brand-push-btn {
+  border: 2px solid #f7a36f;
+  background: #ff7f4d;
+  color: #fff7f2;
+  border-radius: 0.7rem;
+  box-shadow: 6px 6px 0 0 #2a0d0d;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.brand-push-btn:hover {
+  transform: translate(3px, 3px);
+  box-shadow: 3px 3px 0 0 #2a0d0d;
+}
+
+.brand-push-btn-ghost {
+  border: 2px solid #f7a36f;
+  background: #2a1214;
+  color: #ffd7bf;
+  border-radius: 0.7rem;
+  box-shadow: 4px 4px 0 0 #1b090b;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.brand-push-btn-ghost:hover {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 0 #1b090b;
+}
+
+.dot-pattern {
+  background-image: radial-gradient(rgba(255, 176, 129, 0.2) 1.2px, transparent 1.2px);
+  background-size: 32px 32px;
+}
+
 @keyframes heroRise {
   from {
     opacity: 0;
@@ -96,4 +152,18 @@ body {
   transform: translateY(-2px);
   border-color: rgba(255, 210, 178, 0.42);
   box-shadow: 0 18px 48px rgba(255, 112, 64, 0.16);
+}
+
+@keyframes marqueeSlide {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-35%);
+  }
+}
+
+.marquee-track {
+  white-space: nowrap;
+  animation: marqueeSlide 18s linear infinite;
 }
