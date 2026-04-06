@@ -54,7 +54,7 @@ const executeVendorPaymentCore = {
     invoiceId: z.string().min(1),
     expectedAmountCents: z.number().int().positive(),
   }),
-  async invoke({ invoiceId, expectedAmountCents }: PaymentInput) {
+  async invoke({ invoiceId, expectedAmountCents, threadId }: PaymentInput) {
     const pendingInvoices = await getPendingInvoices();
     const target = pendingInvoices.find((invoice) => invoice.id === invoiceId);
 
@@ -74,7 +74,11 @@ const executeVendorPaymentCore = {
       throw new Error("Missing elevated Auth0 access token after authorization.");
     }
 
-    return payInvoice(invoiceId);
+    const idempotencyKey = threadId
+      ? `treasurygate-${threadId}-${invoiceId}`
+      : `treasurygate-${invoiceId}`;
+
+    return payInvoice(invoiceId, idempotencyKey);
   },
 };
 

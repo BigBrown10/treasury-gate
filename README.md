@@ -56,8 +56,16 @@ Open `http://localhost:3000`.
 5. Auth0 CIBA push approval is required before Stripe payment continues.
 6. Once approved, Stripe invoice is paid and receipt/invoice URL is returned in chat.
 
+## Approval Channel
+
+- TreasuryGate uses Auth0 asynchronous authorization (CIBA) for sensitive actions.
+- Approval is an out-of-band Auth0/Guardian push-style confirmation flow.
+- The chat UI automatically polls while approval is pending and resumes execution once approved.
+- Email can be added for notifications, but email is not the authorization control in this MVP.
+
 ## Notes
 
 - The payment tool validates invoice openness and amount before mutation.
+- Stripe payment calls include an idempotency key to prevent accidental duplicate charges during retries.
 - If no Gemini key is provided, chat intent extraction falls back to deterministic regex parsing.
 - Pending/denied/timeout authorization states are surfaced directly in the chat timeline.

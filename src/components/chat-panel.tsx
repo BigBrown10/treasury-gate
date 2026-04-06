@@ -1,11 +1,12 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type ChatResponse = {
   threadId: string;
   status: "awaiting_approval" | "approved_executing" | "denied" | "timed_out" | "completed";
   timeline: string[];
+  retryAfterSeconds?: number;
   payment?: {
     receiptUrl: string;
   };
@@ -27,10 +28,15 @@ export function ChatPanel({ initialPrompt }: ChatPanelProps) {
   const [message, setMessage] = useState(
     initialPrompt ?? "Check if we have enough cash, and if so, pay the $500 Vercel invoice.",
   );
+  const [activeMessage, setActiveMessage] = useState(
+    initialPrompt ?? "Check if we have enough cash, and if so, pay the $500 Vercel invoice.",
+  );
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<ChatResponse | null>(null);
+  const pollTimeoutRef = useRef<number | null>(null);
 
   const helperText = useMemo(() => {
     if (!response) {
@@ -38,16 +44,18 @@ export function ChatPanel({ initialPrompt }: ChatPanelProps) {
     }
 
     if (response.status === "awaiting_approval") {
-      return "Approval pending in Guardian. Re-submit this command after approval to continue polling.";
+      return "Approval pending in Guardian. TreasuryGate will automatically poll for completion.";
     }
 
     return "Payment flow complete. You can run another command now.";
   }, [response]);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
+  const submitRequest = useCallback(async (messageToSend: string, manual: boolean) => {
+    if (manual) {
+      setError(null);
+      setIsSubmitting(true);
+      setActiveMessage(messageToSend);
+    }
 
     try {
       const result = await fetch("/api/chat", {
@@ -56,7 +64,7 @@ export function ChatPanel({ initialPrompt }: ChatPanelProps) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          message,
+          message: messageToSend,
           threadId,
         }),
       });
@@ -69,11 +77,55 @@ export function ChatPanel({ initialPrompt }: ChatPanelProps) {
       const typed = payload as ChatResponse;
       setThreadId(typed.threadId);
       setResponse(typed);
+
+      if (typed.status !== "awaiting_approval") {
+        setIsPolling(false);
+      }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unknown chat error");
+      setIsPolling(false);
     } finally {
-      setIsSubmitting(false);
+      if (manual) {
+        setIsSubmitting(false);
+      }
     }
+  }, [threadId]);
+
+  useEffect(() => {
+    return () => {
+      if (pollTimeoutRef.current) {
+        window.clearTimeout(pollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (response?.status !== "awaiting_approval") {
+      if (pollTimeoutRef.current) {
+        window.clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    const retryAfterMs = Math.max(2, response.retryAfterSeconds ?? 5) * 1000;
+    setIsPolling(true);
+
+    pollTimeoutRef.current = window.setTimeout(() => {
+      void submitRequest(activeMessage, false);
+    }, retryAfterMs);
+
+    return () => {
+      if (pollTimeoutRef.current) {
+        window.clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
+      }
+    };
+  }, [response?.status, response?.retryAfterSeconds, activeMessage, submitRequest]);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await submitRequest(message, true);
   }
 
   return (
@@ -104,6 +156,7 @@ export function ChatPanel({ initialPrompt }: ChatPanelProps) {
           >
             {isSubmitting ? "Running flow..." : "Run treasury action"}
           </button>
+          {isPolling && <p className="text-xs text-amber-100">Approval pending. Auto-checking authorization status...</p>}
         </form>
 
         {error && <p className="rounded-xl border border-rose-400/40 bg-rose-400/10 p-3 text-sm text-rose-100">{error}</p>}

@@ -81,7 +81,10 @@ export async function getPendingInvoices(): Promise<PendingInvoice[]> {
   });
 }
 
-export async function payInvoice(invoiceId: string): Promise<VendorPaymentResult> {
+export async function payInvoice(
+  invoiceId: string,
+  idempotencyKey?: string,
+): Promise<VendorPaymentResult> {
   const stripe = getStripeClient();
   const invoice = await stripe.invoices.retrieve(invoiceId);
 
@@ -89,7 +92,11 @@ export async function payInvoice(invoiceId: string): Promise<VendorPaymentResult
     throw new Error(`Invoice ${invoiceId} is not open and cannot be paid.`);
   }
 
-  const paid = await stripe.invoices.pay(invoiceId);
+  const paid = await stripe.invoices.pay(
+    invoiceId,
+    {},
+    idempotencyKey ? { idempotencyKey } : undefined,
+  );
 
   return {
     invoiceId: paid.id,
