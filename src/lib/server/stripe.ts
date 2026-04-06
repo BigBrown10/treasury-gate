@@ -173,7 +173,6 @@ export async function payInvoice(
       // For demo/test invoices in send_invoice mode, mark as paid manually
       // so status reliably transitions to paid.
       paid_out_of_band: true,
-      forgive: true,
     },
     idempotencyKey ? { idempotencyKey } : undefined,
   );
@@ -185,7 +184,6 @@ export async function payInvoice(
       invoiceId,
       {
         paid_out_of_band: true,
-        forgive: true,
       },
       idempotencyKey ? { idempotencyKey: `${idempotencyKey}-retry` } : undefined,
     );

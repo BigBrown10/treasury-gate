@@ -14,8 +14,7 @@ import {
 export function ItemsManager() {
   const [category, setCategory] = useState<QueueItem["category"] | "">("");
   const [recurrence, setRecurrence] = useState<QueueItem["recurrence"]>("one_time");
-  const [vendorRecipient, setVendorRecipient] = useState("");
-  const [recipientName, setRecipientName] = useState("");
+  const [vendorRecipientName, setVendorRecipientName] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [amount, setAmount] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -53,15 +52,9 @@ export function ItemsManager() {
       return;
     }
 
-    const trimmedVendorRecipient = vendorRecipient.trim();
-    if (!trimmedVendorRecipient) {
+    const trimmedVendorRecipientName = vendorRecipientName.trim();
+    if (!trimmedVendorRecipientName) {
       setError("Vendor / Recipient is required.");
-      return;
-    }
-
-    const trimmedRecipientName = recipientName.trim();
-    if (!trimmedRecipientName) {
-      setError("Recipient name is required.");
       return;
     }
 
@@ -85,8 +78,8 @@ export function ItemsManager() {
       category,
       recurrence,
       autoCreateInvoice,
-      vendor: trimmedVendorRecipient,
-      recipientName: trimmedRecipientName,
+      vendor: trimmedVendorRecipientName,
+      recipientName: trimmedVendorRecipientName,
       recipientEmail: trimmedRecipientEmail,
       amountCents,
       createdAt: nowIso(),
@@ -97,7 +90,7 @@ export function ItemsManager() {
         {
           at: nowIso(),
           step: "item_created",
-          detail: `category=${category}, vendor=${trimmedVendorRecipient}, amountCents=${amountCents}, dueAt=${dueDate} ${dueTime}`,
+          detail: `category=${category}, vendor=${trimmedVendorRecipientName}, amountCents=${amountCents}, dueAt=${dueDate} ${dueTime}`,
         },
       ],
     };
@@ -113,11 +106,11 @@ export function ItemsManager() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            vendor: trimmedVendorRecipient,
-            recipientName: trimmedRecipientName,
+            vendor: trimmedVendorRecipientName,
+            recipientName: trimmedVendorRecipientName,
             recipientEmail: trimmedRecipientEmail,
             amountCents,
-            description: `${trimmedVendorRecipient} autopay item created at ${new Date().toLocaleString()}`,
+            description: `${trimmedVendorRecipientName} autopay item created at ${new Date().toLocaleString()}`,
           }),
         });
 
@@ -195,10 +188,10 @@ export function ItemsManager() {
           </label>
 
           <label className="text-xs uppercase tracking-[0.14em] text-orange-100/75">
-            Vendor / Recipient
+            Vendor / Recipient Name
             <input
-              value={vendorRecipient}
-              onChange={(event) => setVendorRecipient(event.target.value)}
+              value={vendorRecipientName}
+              onChange={(event) => setVendorRecipientName(event.target.value)}
               placeholder="e.g. Mark, Vercel, Logistics Partner"
               className="apple-input mt-1 w-full"
             />
@@ -208,17 +201,7 @@ export function ItemsManager() {
           </label>
 
           <label className="text-xs uppercase tracking-[0.14em] text-orange-100/75">
-            Recipient Name
-            <input
-              value={recipientName}
-              onChange={(event) => setRecipientName(event.target.value)}
-              placeholder="e.g. Mark Johnson"
-              className="apple-input mt-1 w-full"
-            />
-          </label>
-
-          <label className="text-xs uppercase tracking-[0.14em] text-orange-100/75">
-            Recipient Email
+            Vendor / Recipient Email
             <input
               value={recipientEmail}
               onChange={(event) => setRecipientEmail(event.target.value)}

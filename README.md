@@ -98,13 +98,12 @@ Token Vault requirement alignment:
 - For out-of-band cases where `amount_paid` may be zero, displayed paid amount is normalized from invoice totals.
 - Idempotency key strategy: `treasurygate-${threadId}-${invoiceId}`.
 
-## Vendor And Recipient Fields
+## Payee Identity Fields
 
-- `vendor` (shown in UI as `Vendor / Recipient`): required payee label used for matching/reporting.
-- `recipientName`: required human payee identity.
-- `recipientEmail`: required payee email used for Stripe customer mapping.
+- `Vendor / Recipient Name`: required payee identity used for matching/reporting and Stripe customer name.
+- `Vendor / Recipient Email`: required payee email used for Stripe customer mapping.
 
-All three are now mandatory in task creation to avoid identity ambiguity.
+These two fields are mandatory in task creation to avoid identity ambiguity.
 
 ## Approval And Payment Badges
 
