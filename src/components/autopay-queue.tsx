@@ -86,6 +86,38 @@ function cap<T>(entries: T[], max: number): T[] {
   return entries.slice(-max);
 }
 
+function mergeTimeline(existing: string[], incoming?: string[]): string[] {
+  if (!incoming || incoming.length === 0) {
+    return existing;
+  }
+
+  const merged = [...existing];
+  for (const line of incoming) {
+    if (merged[merged.length - 1] !== line) {
+      merged.push(line);
+    }
+  }
+
+  return cap(merged, 60);
+}
+
+function mergeLogs(existing: AgentLog[], incoming?: AgentLog[]): AgentLog[] {
+  if (!incoming || incoming.length === 0) {
+    return existing;
+  }
+
+  const merged = [...existing];
+  for (const entry of incoming) {
+    const last = merged[merged.length - 1];
+    const isDuplicate = last && last.step === entry.step && last.detail === entry.detail;
+    if (!isDuplicate) {
+      merged.push(entry);
+    }
+  }
+
+  return cap(merged, 120);
+}
+
 export function AutopayQueue() {
   const [category, setCategory] = useState<QueueItem["category"]>("supplies");
   const [vendor, setVendor] = useState("Vercel");
@@ -257,8 +289,8 @@ export function AutopayQueue() {
             retryAfterSeconds,
             nextAttemptAt: shouldRetry ? nextAttemptAt : undefined,
             payment: result.payment ?? entry.payment,
-            timeline: result.timeline ? cap([...entry.timeline, ...result.timeline], 60) : entry.timeline,
-            agentLogs: result.agentLogs ? cap([...entry.agentLogs, ...result.agentLogs], 120) : entry.agentLogs,
+            timeline: mergeTimeline(entry.timeline, result.timeline),
+            agentLogs: mergeLogs(entry.agentLogs, result.agentLogs),
           };
         }),
       );
@@ -306,7 +338,7 @@ export function AutopayQueue() {
       }
 
       void processItem(next);
-    }, 2500);
+    }, 6000);
 
     return () => window.clearInterval(interval);
   }, [items]);
@@ -345,6 +377,9 @@ export function AutopayQueue() {
           </p>
           <p className="mt-1 text-xs text-white/65">
             TreasuryGate attempts salary items with a shared thread approval context so approval can cover batch execution.
+          </p>
+          <p className="mt-2 text-xs text-cyan-100">
+            Approval UX note: CIBA approval is typically out-of-band (Auth0 Guardian/device prompt), not an in-page browser modal.
           </p>
         </section>
 
