@@ -178,6 +178,7 @@ export async function POST(request: NextRequest) {
       },
       agentLogs: [
         ...agentLogs,
+        log("authorization_granted", "Auth0 async authorization approved. Executing payment."),
         log(
           "payment_evidence",
           `status=${evidence.status}, verifiedPaid=${evidence.verifiedPaid}, amountPaid=${evidence.amountPaid}`,
@@ -186,6 +187,7 @@ export async function POST(request: NextRequest) {
       timeline: [
         `Matched invoice ${match.id}.`,
         "Approval requested via Auth0 async authorization.",
+        "Auth0 approval granted. Payment execution attempted in Stripe.",
         evidence.verifiedPaid
           ? "Payment verified as paid in Stripe."
           : "Stripe did not report paid status yet.",

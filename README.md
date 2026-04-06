@@ -100,11 +100,18 @@ Token Vault requirement alignment:
 
 ## Vendor And Recipient Fields
 
-- `vendor`: payee organization label for matching/reporting.
-- `recipientName`: human payee label, optional.
-- `recipientEmail`: customer record email in Stripe, optional.
+- `vendor` (shown in UI as `Vendor / Recipient`): required payee label used for matching/reporting.
+- `recipientName`: required human payee identity.
+- `recipientEmail`: required payee email used for Stripe customer mapping.
 
-If recipient email is not provided, a deterministic sandbox-safe email is generated.
+All three are now mandatory in task creation to avoid identity ambiguity.
+
+## Approval And Payment Badges
+
+- Approval badge reflects Auth0 async authorization runtime state.
+- `Approved` is shown only when authorization grant is observed in task agent logs.
+- Payment status badge is separate and reflects Stripe evidence (`completed` vs `payment_unverified`).
+- This separation prevents false interpretation where approval and final Stripe settlement are conflated.
 
 ## Recurring Tasks
 

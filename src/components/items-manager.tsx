@@ -14,7 +14,7 @@ import {
 export function ItemsManager() {
   const [category, setCategory] = useState<QueueItem["category"] | "">("");
   const [recurrence, setRecurrence] = useState<QueueItem["recurrence"]>("one_time");
-  const [vendor, setVendor] = useState("");
+  const [vendorRecipient, setVendorRecipient] = useState("");
   const [recipientName, setRecipientName] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [amount, setAmount] = useState("");
@@ -53,14 +53,25 @@ export function ItemsManager() {
       return;
     }
 
-    const trimmedVendor = vendor.trim();
-    if (!trimmedVendor) {
-      setError("Vendor is required.");
+    const trimmedVendorRecipient = vendorRecipient.trim();
+    if (!trimmedVendorRecipient) {
+      setError("Vendor / Recipient is required.");
+      return;
+    }
+
+    const trimmedRecipientName = recipientName.trim();
+    if (!trimmedRecipientName) {
+      setError("Recipient name is required.");
       return;
     }
 
     const trimmedRecipientEmail = recipientEmail.trim();
-    if (trimmedRecipientEmail.length > 0 && !/^\S+@\S+\.\S+$/.test(trimmedRecipientEmail)) {
+    if (!trimmedRecipientEmail) {
+      setError("Recipient email is required.");
+      return;
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(trimmedRecipientEmail)) {
       setError("Recipient email format is invalid.");
       return;
     }
@@ -74,9 +85,9 @@ export function ItemsManager() {
       category,
       recurrence,
       autoCreateInvoice,
-      vendor: trimmedVendor,
-      recipientName: recipientName.trim() || undefined,
-      recipientEmail: trimmedRecipientEmail || undefined,
+      vendor: trimmedVendorRecipient,
+      recipientName: trimmedRecipientName,
+      recipientEmail: trimmedRecipientEmail,
       amountCents,
       createdAt: nowIso(),
       dueAt: new Date(`${dueDate}T${dueTime}:00`).toISOString(),
@@ -86,7 +97,7 @@ export function ItemsManager() {
         {
           at: nowIso(),
           step: "item_created",
-          detail: `category=${category}, vendor=${trimmedVendor}, amountCents=${amountCents}, dueAt=${dueDate} ${dueTime}`,
+          detail: `category=${category}, vendor=${trimmedVendorRecipient}, amountCents=${amountCents}, dueAt=${dueDate} ${dueTime}`,
         },
       ],
     };
@@ -102,11 +113,11 @@ export function ItemsManager() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            vendor: trimmedVendor,
-            recipientName: recipientName.trim() || undefined,
-            recipientEmail: trimmedRecipientEmail || undefined,
+            vendor: trimmedVendorRecipient,
+            recipientName: trimmedRecipientName,
+            recipientEmail: trimmedRecipientEmail,
             amountCents,
-            description: `${trimmedVendor} autopay item created at ${new Date().toLocaleString()}`,
+            description: `${trimmedVendorRecipient} autopay item created at ${new Date().toLocaleString()}`,
           }),
         });
 
@@ -184,20 +195,20 @@ export function ItemsManager() {
           </label>
 
           <label className="text-xs uppercase tracking-[0.14em] text-orange-100/75">
-            Vendor
+            Vendor / Recipient
             <input
-              value={vendor}
-              onChange={(event) => setVendor(event.target.value)}
-              placeholder="Who receives this payment? e.g. Vercel"
+              value={vendorRecipient}
+              onChange={(event) => setVendorRecipient(event.target.value)}
+              placeholder="e.g. Mark, Vercel, Logistics Partner"
               className="apple-input mt-1 w-full"
             />
             <p className="mt-1 text-[11px] normal-case tracking-normal text-white/65">
-              Vendor is the payee organization label used for matching and reporting.
+              Required payee label used for matching and reporting.
             </p>
           </label>
 
           <label className="text-xs uppercase tracking-[0.14em] text-orange-100/75">
-            Recipient Name (optional)
+            Recipient Name
             <input
               value={recipientName}
               onChange={(event) => setRecipientName(event.target.value)}
@@ -207,7 +218,7 @@ export function ItemsManager() {
           </label>
 
           <label className="text-xs uppercase tracking-[0.14em] text-orange-100/75">
-            Recipient Email (optional)
+            Recipient Email
             <input
               value={recipientEmail}
               onChange={(event) => setRecipientEmail(event.target.value)}
@@ -215,7 +226,7 @@ export function ItemsManager() {
               className="apple-input mt-1 w-full"
             />
             <p className="mt-1 text-[11px] normal-case tracking-normal text-white/65">
-              If empty, TreasuryGate generates a safe test email for Stripe sandbox records.
+              Required for Stripe customer record and payee identity mapping.
             </p>
           </label>
 

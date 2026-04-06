@@ -173,11 +173,25 @@ export async function payInvoice(
       // For demo/test invoices in send_invoice mode, mark as paid manually
       // so status reliably transitions to paid.
       paid_out_of_band: true,
+      forgive: true,
     },
     idempotencyKey ? { idempotencyKey } : undefined,
   );
 
-  const verifiedInvoice = await stripe.invoices.retrieve(paid.id);
+  let verifiedInvoice = await stripe.invoices.retrieve(paid.id);
+
+  if (verifiedInvoice.status !== "paid") {
+    await stripe.invoices.pay(
+      invoiceId,
+      {
+        paid_out_of_band: true,
+        forgive: true,
+      },
+      idempotencyKey ? { idempotencyKey: `${idempotencyKey}-retry` } : undefined,
+    );
+
+    verifiedInvoice = await stripe.invoices.retrieve(paid.id);
+  }
   const stripeInvoiceUrl = `https://dashboard.stripe.com/test/invoices/${encodeURIComponent(verifiedInvoice.id)}`;
 
   return {

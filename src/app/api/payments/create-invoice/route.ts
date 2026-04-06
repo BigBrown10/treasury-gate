@@ -5,8 +5,8 @@ import { createOpenInvoiceForVendor } from "@/lib/server/stripe";
 
 const schema = z.object({
   vendor: z.string().min(1),
-  recipientName: z.string().optional(),
-  recipientEmail: z.string().email().optional(),
+  recipientName: z.string().min(1),
+  recipientEmail: z.string().email(),
   amountCents: z.number().int().positive(),
   description: z.string().optional(),
 });

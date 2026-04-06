@@ -37,11 +37,13 @@ function getApprovalState(item: QueueItem): {
   label: string;
   tone: string;
 } {
+  const authorizationGranted = item.agentLogs.some((entry) => entry.step === "authorization_granted");
+
   if (item.status === "awaiting_approval") {
     return { label: "Approval Pending", tone: "border-amber-300/45 bg-amber-300/10 text-amber-100" };
   }
 
-  if (["completed", "payment_unverified"].includes(item.status)) {
+  if (authorizationGranted) {
     return { label: "Approved", tone: "border-emerald-300/45 bg-emerald-300/10 text-emerald-100" };
   }
 
