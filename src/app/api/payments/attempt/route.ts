@@ -182,6 +182,7 @@ export async function POST(request: NextRequest) {
           threadId,
           status: mapped.status,
           timeline: [mapped.message],
+          agentLogs: [log("authorization_state", mapped.message)],
           retryAfterSeconds: mapped.retryAfterSeconds,
         },
         { status: 202 },

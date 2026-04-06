@@ -221,6 +221,19 @@ export function TasksMonitor() {
     }
   }, [activePanel, liveTasks, reviewsByItemId, reviewLoading]);
 
+  useEffect(() => {
+    if (!activePanel) {
+      document.body.style.overflow = "";
+      return;
+    }
+
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [activePanel]);
+
   return (
     <section className="relative overflow-hidden rounded-[2rem] border border-orange-100/20 bg-white/10 p-6 shadow-2xl backdrop-blur-2xl">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_8%,_rgba(251,146,60,.28),_transparent_40%)]" />
@@ -269,7 +282,7 @@ export function TasksMonitor() {
         {activePanel && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 px-4 py-8 backdrop-blur-md" onClick={() => setActivePanel(null)}>
             <article
-              className="modal-pop relative max-h-[85vh] w-full max-w-4xl overflow-auto rounded-3xl border border-orange-100/30 bg-gradient-to-b from-[#261215] to-[#160d15] p-6 shadow-[0_20px_80px_rgba(255,110,70,.24)]"
+              className="modal-pop modal-scroll relative max-h-[85vh] w-full max-w-4xl overflow-auto rounded-3xl border border-orange-100/30 bg-gradient-to-b from-[#261215] to-[#160d15] p-6 shadow-[0_20px_80px_rgba(255,110,70,.24)]"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-3">

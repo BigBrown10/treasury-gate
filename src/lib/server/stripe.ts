@@ -194,14 +194,20 @@ export async function getInvoicePaymentEvidence(
   const stripe = getStripeClient();
   const invoice = await stripe.invoices.retrieve(invoiceId);
   const stripeInvoiceUrl = `https://dashboard.stripe.com/test/invoices/${encodeURIComponent(invoice.id)}`;
+  const normalizedAmountPaid =
+    invoice.amount_paid > 0
+      ? invoice.amount_paid
+      : invoice.status === "paid"
+        ? invoice.total
+        : invoice.amount_paid;
 
   return {
     invoiceId: invoice.id,
     status: invoice.status,
-    amountPaid: invoice.amount_paid,
+    amountPaid: normalizedAmountPaid,
     currency: invoice.currency.toUpperCase(),
     hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
     stripeInvoiceUrl,
-    verifiedPaid: invoice.status === "paid" && invoice.amount_paid > 0,
+    verifiedPaid: invoice.status === "paid",
   };
 }

@@ -187,3 +187,23 @@ body {
   white-space: nowrap;
   animation: marqueeSlide 18s linear infinite;
 }
+
+.modal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #f7a36f #2a1214;
+}
+
+.modal-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.modal-scroll::-webkit-scrollbar-track {
+  background: #2a1214;
+  border-radius: 999px;
+}
+
+.modal-scroll::-webkit-scrollbar-thumb {
+  background: #f7a36f;
+  border-radius: 999px;
+  border: 2px solid #2a1214;
+}
