@@ -21,9 +21,11 @@ type QueueStatus =
 
 type QueueItem = {
   id: string;
+  category: "salary" | "supplies" | "logistics" | "other";
   vendor: string;
   amountCents: number;
   createdAt: string;
+  dueAt: string;
   threadId?: string;
   invoiceId?: string;
   invoiceUrl?: string;
@@ -76,8 +78,10 @@ function canAutoProcess(item: QueueItem): boolean {
 }
 
 export function AutopayQueue() {
+  const [category, setCategory] = useState<QueueItem["category"]>("supplies");
   const [vendor, setVendor] = useState("Vercel");
   const [amount, setAmount] = useState("50");
+  const [dueDate, setDueDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [autoCreateInvoice, setAutoCreateInvoice] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,16 +123,18 @@ export function AutopayQueue() {
 
     const baseItem: QueueItem = {
       id,
+      category,
       vendor: vendor.trim(),
       amountCents,
       createdAt: nowIso(),
+      dueAt: new Date(`${dueDate}T09:00:00`).toISOString(),
       status: "queued",
       timeline: ["Payable item created."],
       agentLogs: [
         {
           at: nowIso(),
           step: "item_created",
-          detail: `vendor=${vendor.trim()}, amountCents=${amountCents}`,
+          detail: `category=${category}, vendor=${vendor.trim()}, amountCents=${amountCents}, dueAt=${dueDate}`,
         },
       ],
     };
@@ -304,10 +310,32 @@ export function AutopayQueue() {
 
         <form onSubmit={onAddItem} className="grid gap-3 rounded-2xl border border-white/20 bg-black/20 p-4 sm:grid-cols-2">
           <label className="text-xs uppercase tracking-[0.14em] text-white/65">
+            Category
+            <select
+              value={category}
+              onChange={(event) => setCategory(event.target.value as QueueItem["category"])}
+              className="mt-1 w-full rounded-xl border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-cyan-200/60"
+            >
+              <option value="salary">Salary</option>
+              <option value="supplies">New Supplies</option>
+              <option value="logistics">Logistics</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label className="text-xs uppercase tracking-[0.14em] text-white/65">
             Vendor
             <input
               value={vendor}
               onChange={(event) => setVendor(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-cyan-200/60"
+            />
+          </label>
+          <label className="text-xs uppercase tracking-[0.14em] text-white/65">
+            Due date
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
               className="mt-1 w-full rounded-xl border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-cyan-200/60"
             />
           </label>
@@ -353,6 +381,8 @@ export function AutopayQueue() {
               </div>
 
               <p className="mt-1 text-xs text-white/70">Created: {new Date(item.createdAt).toLocaleString()}</p>
+              <p className="text-xs text-white/70">Category: {item.category}</p>
+              <p className="text-xs text-white/70">Due: {new Date(item.dueAt).toLocaleDateString()}</p>
               {item.nextAttemptAt && (
                 <p className="text-xs text-amber-100">Next auto-attempt: {new Date(item.nextAttemptAt).toLocaleTimeString()}</p>
               )}

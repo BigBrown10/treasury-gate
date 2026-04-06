@@ -7,7 +7,7 @@ import {
   getPendingInvoicesTool,
   mapAuth0InterruptToStatus,
 } from "@/lib/agent/tools";
-import { getInvoicePaymentEvidence } from "@/lib/server/stripe";
+import { getInvoiceById, getInvoicePaymentEvidence } from "@/lib/server/stripe";
 
 const schema = z.object({
   itemId: z.string().min(1),
@@ -22,6 +22,8 @@ type AgentLog = {
   step: string;
   detail: string;
 };
+
+const DEFAULT_RETRY_SECONDS = 20;
 
 function log(step: string, detail: string): AgentLog {
   return { at: new Date().toISOString(), step, detail };
@@ -48,7 +50,7 @@ export async function POST(request: NextRequest) {
       ),
     );
 
-    const match = invoices.find((invoice) => {
+    let match = invoices.find((invoice) => {
       if (input.invoiceId) {
         return invoice.id === input.invoiceId;
       }
@@ -60,11 +62,57 @@ export async function POST(request: NextRequest) {
       return amountMatch && vendorMatch;
     });
 
+    if (!match && input.invoiceId) {
+      const exactInvoice = await getInvoiceById(input.invoiceId);
+
+      if (exactInvoice.status === "paid") {
+        const paidEvidence = await getInvoicePaymentEvidence(exactInvoice.id);
+        return NextResponse.json({
+          itemId: input.itemId,
+          threadId,
+          status: "completed",
+          payment: {
+            status: paidEvidence.status,
+            verifiedPaid: paidEvidence.verifiedPaid,
+            amountPaid: paidEvidence.amountPaid,
+            currency: paidEvidence.currency,
+            receiptUrl: paidEvidence.hostedInvoiceUrl ?? paidEvidence.stripeInvoiceUrl,
+            stripeInvoiceUrl: paidEvidence.stripeInvoiceUrl,
+          },
+          agentLogs: [...agentLogs, log("already_paid", `invoice=${exactInvoice.id}`)],
+          timeline: [
+            `Invoice ${exactInvoice.id} is already paid in Stripe.`,
+            "Skipping payment execution.",
+          ],
+        });
+      }
+
+      if (exactInvoice.status !== "open") {
+        return NextResponse.json({
+          itemId: input.itemId,
+          threadId,
+          status: "waiting_invoice",
+          retryAfterSeconds: DEFAULT_RETRY_SECONDS,
+          agentLogs: [
+            ...agentLogs,
+            log("invoice_not_open", `invoice=${exactInvoice.id}, status=${exactInvoice.status}`),
+          ],
+          timeline: [
+            `Invoice ${exactInvoice.id} exists but is ${exactInvoice.status ?? "unknown"}.`,
+            "Waiting for invoice to be open before attempting payment.",
+          ],
+        });
+      }
+
+      match = exactInvoice;
+    }
+
     if (!match) {
       return NextResponse.json({
         itemId: input.itemId,
         threadId,
         status: "waiting_invoice",
+        retryAfterSeconds: DEFAULT_RETRY_SECONDS,
         agentLogs: [...agentLogs, log("invoice_not_found", "No matching open invoice found yet")],
         timeline: [
           `No open invoice found for ${input.vendor} at ${(input.amountCents / 100).toFixed(2)}.`,
@@ -78,6 +126,7 @@ export async function POST(request: NextRequest) {
         itemId: input.itemId,
         threadId,
         status: "insufficient_funds",
+        retryAfterSeconds: DEFAULT_RETRY_SECONDS,
         agentLogs: [...agentLogs, log("insufficient_funds", `need=${match.amountDue}, available=${balance.available * 100}`)],
         timeline: [
           `Insufficient liquidity for invoice ${match.id}.`,

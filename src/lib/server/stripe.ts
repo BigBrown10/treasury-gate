@@ -102,6 +102,15 @@ export async function getPendingInvoices(): Promise<PendingInvoice[]> {
   return result.data.map((invoice) => normalizeInvoice(invoice));
 }
 
+export async function getInvoiceById(invoiceId: string): Promise<PendingInvoice> {
+  const stripe = getStripeClient();
+  const invoice = await stripe.invoices.retrieve(invoiceId, {
+    expand: ["customer"],
+  });
+
+  return normalizeInvoice(invoice);
+}
+
 export async function createOpenInvoiceForVendor(
   input: CreateInvoiceInput,
 ): Promise<PendingInvoice> {
