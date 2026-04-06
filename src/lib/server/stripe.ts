@@ -27,6 +27,16 @@ export type VendorPaymentResult = {
   currency: string;
 };
 
+export type InvoicePaymentEvidence = {
+  invoiceId: string;
+  status: string | null;
+  amountPaid: number;
+  currency: string;
+  hostedInvoiceUrl: string | null;
+  stripeInvoiceUrl: string;
+  verifiedPaid: boolean;
+};
+
 let stripeClient: Stripe | null = null;
 
 function getStripeClient(): Stripe {
@@ -114,5 +124,23 @@ export async function payInvoice(
     verifiedPaid: verifiedInvoice.status === "paid",
     amountPaid: verifiedInvoice.amount_paid,
     currency: verifiedInvoice.currency.toUpperCase(),
+  };
+}
+
+export async function getInvoicePaymentEvidence(
+  invoiceId: string,
+): Promise<InvoicePaymentEvidence> {
+  const stripe = getStripeClient();
+  const invoice = await stripe.invoices.retrieve(invoiceId);
+  const stripeInvoiceUrl = `https://dashboard.stripe.com/test/invoices/${encodeURIComponent(invoice.id)}`;
+
+  return {
+    invoiceId: invoice.id,
+    status: invoice.status,
+    amountPaid: invoice.amount_paid,
+    currency: invoice.currency.toUpperCase(),
+    hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+    stripeInvoiceUrl,
+    verifiedPaid: invoice.status === "paid" && invoice.amount_paid > 0,
   };
 }

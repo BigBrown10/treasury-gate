@@ -10,6 +10,7 @@ import {
   mapAuth0InterruptToStatus,
 } from "@/lib/agent/tools";
 import { hasGeminiKey } from "@/lib/server/env";
+import { getInvoicePaymentEvidence } from "@/lib/server/stripe";
 
 type MessageBody = {
   message?: string;
@@ -41,6 +42,17 @@ function log(step: string, detail: string): AgentLogEntry {
 
 function normalizePaymentResponse(rawPayment: unknown, invoiceId: string): NormalizedPayment {
   const dashboardUrl = `https://dashboard.stripe.com/test/invoices/${encodeURIComponent(invoiceId)}`;
+
+  if (typeof rawPayment === "string") {
+    return {
+      receiptUrl: dashboardUrl,
+      status: rawPayment,
+      amountPaid: 0,
+      currency: "USD",
+      verifiedPaid: false,
+      stripeInvoiceUrl: dashboardUrl,
+    };
+  }
 
   if (!rawPayment || typeof rawPayment !== "object") {
     return {
@@ -198,7 +210,16 @@ export async function POST(request: NextRequest) {
       threadId,
     });
 
-    const payment = normalizePaymentResponse(paymentRaw, targetInvoice.id);
+    const normalizedPayment = normalizePaymentResponse(paymentRaw, targetInvoice.id);
+    const evidence = await getInvoicePaymentEvidence(targetInvoice.id);
+    const payment: NormalizedPayment = {
+      receiptUrl: evidence.hostedInvoiceUrl ?? normalizedPayment.receiptUrl,
+      status: evidence.status ?? normalizedPayment.status,
+      amountPaid: evidence.amountPaid,
+      currency: evidence.currency,
+      verifiedPaid: evidence.verifiedPaid,
+      stripeInvoiceUrl: evidence.stripeInvoiceUrl,
+    };
     agentLogs.push(
       log(
         "payment_executed",
