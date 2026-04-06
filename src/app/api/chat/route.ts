@@ -1,0 +1,164 @@
+import { google } from "@ai-sdk/google";
+import { generateObject } from "ai";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+import {
+  getExecuteVendorPaymentTool,
+  getBankBalanceTool,
+  getPendingInvoicesTool,
+  mapAuth0InterruptToStatus,
+} from "@/lib/agent/tools";
+import { hasGeminiKey } from "@/lib/server/env";
+
+type MessageBody = {
+  message?: string;
+  threadId?: string;
+};
+
+function parseIntentFallback(message: string): { amountCents: number | null; vendor: string | null } {
+  const amountMatch = message.match(/\$(\d+(?:\.\d{1,2})?)/);
+  const amountCents = amountMatch ? Math.round(Number.parseFloat(amountMatch[1]) * 100) : null;
+
+  const vendorMatch = message.match(/pay\s+the\s+\$?\d+(?:\.\d{1,2})?\s+(.+?)\s+invoice/i);
+  const vendor = vendorMatch?.[1]?.trim() ?? null;
+
+  return { amountCents, vendor };
+}
+
+async function parseIntent(message: string): Promise<{ amountCents: number | null; vendor: string | null }> {
+  if (!hasGeminiKey()) {
+    return parseIntentFallback(message);
+  }
+
+  try {
+    const response = await generateObject({
+      model: google("gemini-2.5-pro"),
+      schema: z.object({
+        amountCents: z.number().int().nullable(),
+        vendor: z.string().nullable(),
+      }),
+      prompt: `Extract payment intent from user message. Return amountCents and vendor if present. Message: ${message}`,
+    });
+
+    return response.object;
+  } catch {
+    return parseIntentFallback(message);
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const body = (await request.json()) as MessageBody;
+  const message = body.message?.trim();
+  const threadId = body.threadId ?? crypto.randomUUID();
+  const userId = request.headers.get("x-user-id") ?? "demo-user";
+
+  if (!message) {
+    return NextResponse.json({ error: "message is required" }, { status: 400 });
+  }
+
+  const intent = await parseIntent(message);
+
+  if (!intent.amountCents) {
+    return NextResponse.json({
+      threadId,
+      status: "completed",
+      timeline: [
+        "I could not find a dollar amount in your request.",
+        "Try: 'Check if we have enough cash, and if so, pay the $500 Vercel invoice.'",
+      ],
+    });
+  }
+
+  try {
+    const [balance, invoices] = await Promise.all([
+      getBankBalanceTool.invoke(),
+      getPendingInvoicesTool.invoke(),
+    ]);
+
+    const targetInvoice = invoices.find((invoice) => {
+      const amountMatch = invoice.amountDue === intent.amountCents;
+      const vendorMatch = intent.vendor
+        ? `${invoice.customerName ?? ""} ${invoice.description ?? ""}`
+            .toLowerCase()
+            .includes(intent.vendor.toLowerCase())
+        : true;
+
+      return amountMatch && vendorMatch;
+    });
+
+    if (!targetInvoice) {
+      return NextResponse.json({
+        threadId,
+        status: "completed",
+        timeline: [
+          `Bank balance check passed: ${balance.isoCurrencyCode} ${balance.available.toFixed(2)} available.`,
+          `No open invoice matched amount $${(intent.amountCents / 100).toFixed(2)}${
+            intent.vendor ? ` for vendor '${intent.vendor}'` : ""
+          }.`,
+        ],
+      });
+    }
+
+    if (balance.available * 100 < targetInvoice.amountDue) {
+      return NextResponse.json({
+        threadId,
+        status: "completed",
+        timeline: [
+          `Insufficient liquidity: available ${balance.isoCurrencyCode} ${balance.available.toFixed(2)}.`,
+          `Invoice ${targetInvoice.id} requires ${(targetInvoice.amountDue / 100).toFixed(2)} ${targetInvoice.currency}.`,
+        ],
+      });
+    }
+
+    const timeline = [
+      `Liquidity confirmed: ${balance.isoCurrencyCode} ${balance.available.toFixed(2)} available.`,
+      `Matched open invoice ${targetInvoice.id} (${targetInvoice.amountDueDisplay}).`,
+      "Awaiting mobile approval via Auth0 CIBA push notification...",
+    ];
+
+    const payment = await getExecuteVendorPaymentTool().invoke({
+      invoiceId: targetInvoice.id,
+      expectedAmountCents: targetInvoice.amountDue,
+      userId,
+      threadId,
+    });
+
+    timeline.push("Authorization approved. Executing Stripe payment now...");
+    timeline.push(`Invoice paid. Receipt: ${payment.receiptUrl}`);
+
+    return NextResponse.json({
+      threadId,
+      status: "completed",
+      timeline,
+      payment,
+    });
+  } catch (error) {
+    const mapped = mapAuth0InterruptToStatus(error);
+    if (mapped) {
+      return NextResponse.json(
+        {
+          threadId,
+          status: mapped.status,
+          timeline: [
+            "Liquidity confirmed and invoice selected.",
+            "Payment execution paused for Auth0 asynchronous authorization.",
+            mapped.message,
+          ],
+          retryAfterSeconds: mapped.retryAfterSeconds,
+        },
+        { status: 202 },
+      );
+    }
+
+    const messageText = error instanceof Error ? error.message : "Unknown chat execution error";
+    return NextResponse.json(
+      {
+        threadId,
+        status: "timed_out",
+        timeline: ["Payment flow failed before completion.", messageText],
+      },
+      { status: 500 },
+    );
+  }
+}

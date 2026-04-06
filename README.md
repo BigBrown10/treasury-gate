@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TreasuryGate (Real API MVP)
 
-## Getting Started
+TreasuryGate is a Next.js 16 treasury agent demo that:
 
-First, run the development server:
+- reads real Stripe Test Mode open invoices,
+- reads real Plaid Sandbox balances,
+- and gates Stripe invoice payment execution via Auth0 asynchronous authorization.
+
+## Stack
+
+- Next.js 16 + TypeScript + Tailwind CSS
+- Stripe Node SDK (`stripe`)
+- Plaid Node SDK (`plaid`)
+- Auth0 AI LangChain SDK (`@auth0/ai-langchain`)
+- Vercel AI SDK with Gemini provider (`ai`, `@ai-sdk/google`)
+
+## Required Environment
+
+Copy `.env.local.example` to `.env.local` and fill values:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+AUTH0_CLIENT_ID=
+AUTH0_SECRET=
+STRIPE_SECRET_KEY=
+PLAID_CLIENT_ID=
+PLAID_SECRET=
+AUTH0_DOMAIN=
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Optional:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `AUTH0_AUDIENCE`
+- `GOOGLE_GENERATIVE_AI_API_KEY` (advanced intent extraction)
+- `PLAID_ACCESS_TOKEN`
+- `STRIPE_INVOICE_LIMIT`
+- `PLAID_SANDBOX_INSTITUTION_ID`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Run
 
-## Learn More
+```bash
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open `http://localhost:3000`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Real Execution Flow
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Dashboard loads and fetches live Plaid sandbox balance + open Stripe test invoices.
+2. In chat, run:
+	`Check if we have enough cash, and if so, pay the $500 Vercel invoice.`
+3. Agent runs read-only checks:
+	- `get_bank_balance`
+	- `get_pending_invoices`
+4. Agent attempts `execute_vendor_payment`, wrapped by Auth0 `withAsyncAuthorization()`.
+5. Auth0 CIBA push approval is required before Stripe payment continues.
+6. Once approved, Stripe invoice is paid and receipt/invoice URL is returned in chat.
 
-## Deploy on Vercel
+## Notes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- The payment tool validates invoice openness and amount before mutation.
+- If no Gemini key is provided, chat intent extraction falls back to deterministic regex parsing.
+- Pending/denied/timeout authorization states are surfaced directly in the chat timeline.
