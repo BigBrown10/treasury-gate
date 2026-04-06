@@ -26,6 +26,27 @@ type AiReview = {
   nextAction: string;
 };
 
+function localReview(item: QueueItem): AiReview {
+  const latest = item.agentLogs.at(-1);
+  const settled = item.payment?.verifiedPaid;
+
+  if (settled) {
+    return {
+      title: "Settlement confirmed",
+      summary: `${item.vendor} appears settled with Stripe evidence available for review.`,
+      riskLevel: "low",
+      nextAction: "Move this task to closeout and reconcile in your ledger workflow.",
+    };
+  }
+
+  return {
+    title: "Execution in progress",
+    summary: `${item.vendor} is currently ${item.status}. Latest system event: ${latest?.step ?? "unknown"}.`,
+    riskLevel: item.status === "awaiting_approval" ? "medium" : "high",
+    nextAction: "Review approval badge and Stripe evidence link, then re-check this task shortly.",
+  };
+}
+
 function nextMonthIso(currentDueAt: string): string {
   const date = new Date(currentDueAt);
   const copy = new Date(date);
@@ -41,6 +62,10 @@ function getApprovalState(item: QueueItem): {
 
   if (item.status === "awaiting_approval") {
     return { label: "Approval Pending", tone: "border-amber-300/45 bg-amber-300/10 text-amber-100" };
+  }
+
+  if (authorizationGranted && item.status === "payment_unverified") {
+    return { label: "Approved, Settlement Pending", tone: "border-orange-300/45 bg-orange-300/10 text-orange-100" };
   }
 
   if (authorizationGranted) {
@@ -317,12 +342,7 @@ export function TasksMonitor() {
         .catch(() => {
           setReviewsByItemId((current) => ({
             ...current,
-            [item.id]: {
-              title: "Review unavailable",
-              summary: "AI review could not be generated right now.",
-              riskLevel: "medium",
-              nextAction: "Use task status and payment evidence link to continue review.",
-            },
+            [item.id]: localReview(item),
           }));
         })
         .finally(() => {

@@ -26,7 +26,7 @@ type AgentLog = {
 
 const DEFAULT_RETRY_SECONDS = 20;
 
-const EVIDENCE_RETRY_ATTEMPTS = 3;
+const EVIDENCE_RETRY_ATTEMPTS = 8;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const paymentResultRaw = await getExecuteVendorPaymentTool().invoke({
+    let paymentResultRaw = await getExecuteVendorPaymentTool().invoke({
       invoiceId: match.id,
       expectedAmountCents: match.amountDue,
       userId,
@@ -171,7 +171,28 @@ export async function POST(request: NextRequest) {
     let evidence = await getInvoicePaymentEvidence(match.id);
     if (!evidence.verifiedPaid) {
       for (let attempt = 0; attempt < EVIDENCE_RETRY_ATTEMPTS; attempt += 1) {
-        await delay(800);
+        await delay(1000);
+        evidence = await getInvoicePaymentEvidence(match.id);
+        if (evidence.verifiedPaid) {
+          break;
+        }
+      }
+    }
+
+    // If Auth0 already granted execution but Stripe still reads open,
+    // run one additional auth-gated execute attempt (idempotent) and re-check.
+    if (!evidence.verifiedPaid) {
+      paymentResultRaw = await getExecuteVendorPaymentTool().invoke({
+        invoiceId: match.id,
+        expectedAmountCents: match.amountDue,
+        userId,
+        threadId,
+      });
+
+      void paymentResultRaw;
+
+      for (let attempt = 0; attempt < EVIDENCE_RETRY_ATTEMPTS; attempt += 1) {
+        await delay(1000);
         evidence = await getInvoicePaymentEvidence(match.id);
         if (evidence.verifiedPaid) {
           break;
