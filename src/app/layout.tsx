@@ -19,11 +19,11 @@ export default function RootLayout({
           <nav className="mx-auto flex w-full max-w-[1400px] items-center justify-between px-4 py-3 sm:px-8">
             <p className="text-sm font-semibold tracking-[0.08em] text-cyan-100">TreasuryGate</p>
             <div className="flex items-center gap-2 text-xs uppercase tracking-[0.12em] text-white/70">
-              <Link href="/" className="rounded-lg border border-white/15 px-3 py-1.5 transition hover:bg-white/10">
-                Overview
+              <Link href="/main" className="rounded-lg border border-white/15 px-3 py-1.5 transition hover:bg-white/10">
+                Get Started
               </Link>
               <Link href="/tasks" className="rounded-lg border border-cyan-200/35 bg-cyan-200/10 px-3 py-1.5 text-cyan-100 transition hover:bg-cyan-200/20">
-                View Tasks
+                Tasks
               </Link>
             </div>
           </nav>

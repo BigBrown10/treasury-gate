@@ -18,3 +18,55 @@ body {
   font-family: var(--font-sans);
   text-rendering: optimizeLegibility;
 }
+
+@keyframes heroRise {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes heroPulse {
+  0% {
+    opacity: 0.48;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 0.48;
+    transform: scale(1);
+  }
+}
+
+.hero-reveal {
+  animation: heroRise 0.7s ease-out both;
+}
+
+.hero-reveal-delay-1 {
+  animation: heroRise 0.8s ease-out 0.1s both;
+}
+
+.hero-reveal-delay-2 {
+  animation: heroRise 0.9s ease-out 0.2s both;
+}
+
+.hero-reveal-delay-3 {
+  animation: heroRise 1s ease-out 0.3s both;
+}
+
+.hero-pulse {
+  animation: heroPulse 5.6s ease-in-out infinite;
+}
+
+.hero-pulse-delay {
+  animation: heroPulse 6.5s ease-in-out 0.7s infinite;
+}
