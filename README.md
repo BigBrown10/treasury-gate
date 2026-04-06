@@ -5,6 +5,7 @@ TreasuryGate is a Next.js 16 treasury agent demo that:
 - reads real Stripe Test Mode open invoices,
 - reads real Plaid Sandbox balances,
 - and gates Stripe invoice payment execution via Auth0 asynchronous authorization.
+- supports an autonomous payable queue with categories and due dates.
 
 ## Stack
 
@@ -47,21 +48,26 @@ Open `http://localhost:3000`.
 ## Real Execution Flow
 
 1. Dashboard loads and fetches live Plaid sandbox balance + open Stripe test invoices.
-2. In chat, run:
-	`Check if we have enough cash, and if so, pay the $500 Vercel invoice.`
+2. Finance team adds queue items (salary, supplies, logistics, other) with due dates.
 3. Agent runs read-only checks:
 	- `get_bank_balance`
 	- `get_pending_invoices`
-4. Agent attempts `execute_vendor_payment`, wrapped by Auth0 `withAsyncAuthorization()`.
-5. Auth0 CIBA push approval is required before Stripe payment continues.
-6. Once approved, Stripe invoice is paid and receipt/invoice URL is returned in chat.
+4. Agent matches or auto-creates Stripe invoices, then attempts `execute_vendor_payment` wrapped by Auth0 `withAsyncAuthorization()`.
+5. Auth0 CIBA approval is required before Stripe payment execution continues.
+6. After approval, Stripe invoice is paid and the queue item stores Stripe proof URL + status.
 
 ## Approval Channel
 
 - TreasuryGate uses Auth0 asynchronous authorization (CIBA) for sensitive actions.
 - Approval is an out-of-band Auth0/Guardian push-style confirmation flow.
-- The chat UI automatically polls while approval is pending and resumes execution once approved.
+- The queue auto-polls while approval is pending and resumes execution once approved.
 - Email can be added for notifications, but email is not the authorization control in this MVP.
+
+## Auth0 Token Clarification
+
+- Do not paste a runtime access token into `.env.local`.
+- Keep using `AUTH0_CLIENT_ID`, `AUTH0_SECRET`, `AUTH0_DOMAIN`, and `AUTH0_AUDIENCE`.
+- The app requests authorization tokens dynamically during execution.
 
 ## Notes
 

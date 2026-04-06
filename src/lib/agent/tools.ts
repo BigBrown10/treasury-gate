@@ -100,6 +100,7 @@ export function getExecuteVendorPaymentTool() {
       requestedExpiry: 300,
       audience: env.AUTH0_AUDIENCE,
       scopes: ["payments:execute"],
+      credentialsContext: "thread",
       onAuthorizationRequest: "interrupt",
     },
     executeVendorPaymentCore,

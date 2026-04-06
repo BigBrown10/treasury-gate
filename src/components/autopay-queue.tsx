@@ -77,6 +77,15 @@ function canAutoProcess(item: QueueItem): boolean {
   return ["queued", "waiting_invoice", "awaiting_approval", "payment_unverified"].includes(item.status);
 }
 
+function isDueToday(item: QueueItem): boolean {
+  const today = new Date().toISOString().slice(0, 10);
+  return item.dueAt.slice(0, 10) <= today;
+}
+
+function cap<T>(entries: T[], max: number): T[] {
+  return entries.slice(-max);
+}
+
 export function AutopayQueue() {
   const [category, setCategory] = useState<QueueItem["category"]>("supplies");
   const [vendor, setVendor] = useState("Vercel");
@@ -199,7 +208,7 @@ export function AutopayQueue() {
     }
   }
 
-  async function processItem(item: QueueItem): Promise<void> {
+  async function processItem(item: QueueItem, forcedThreadId?: string): Promise<void> {
     const now = Date.now();
     if (item.nextAttemptAt && new Date(item.nextAttemptAt).getTime() > now) {
       return;
@@ -218,7 +227,7 @@ export function AutopayQueue() {
           vendor: item.vendor,
           amountCents: item.amountCents,
           invoiceId: item.invoiceId,
-          threadId: item.threadId,
+          threadId: forcedThreadId ?? item.threadId,
         }),
       });
 
@@ -248,8 +257,8 @@ export function AutopayQueue() {
             retryAfterSeconds,
             nextAttemptAt: shouldRetry ? nextAttemptAt : undefined,
             payment: result.payment ?? entry.payment,
-            timeline: result.timeline ? [...entry.timeline, ...result.timeline] : entry.timeline,
-            agentLogs: result.agentLogs ? [...entry.agentLogs, ...result.agentLogs] : entry.agentLogs,
+            timeline: result.timeline ? cap([...entry.timeline, ...result.timeline], 60) : entry.timeline,
+            agentLogs: result.agentLogs ? cap([...entry.agentLogs, ...result.agentLogs], 120) : entry.agentLogs,
           };
         }),
       );
@@ -279,6 +288,18 @@ export function AutopayQueue() {
         return;
       }
 
+      const salaryDue = items.filter(
+        (item) => item.category === "salary" && isDueToday(item) && canAutoProcess(item),
+      );
+
+      if (salaryDue.length > 0) {
+        const sharedThreadId =
+          salaryDue.find((item) => item.threadId)?.threadId ??
+          `salary-batch-${new Date().toISOString().slice(0, 10)}`;
+        void processItem(salaryDue[0], sharedThreadId);
+        return;
+      }
+
       const next = items.find((item) => canAutoProcess(item));
       if (!next) {
         return;
@@ -295,6 +316,15 @@ export function AutopayQueue() {
     [items],
   );
 
+  const salaryDueToday = useMemo(
+    () => items.filter((item) => item.category === "salary" && isDueToday(item)),
+    [items],
+  );
+  const salaryBatchTotal = useMemo(
+    () => salaryDueToday.reduce((sum, item) => sum + item.amountCents, 0),
+    [salaryDueToday],
+  );
+
   return (
     <section className="relative overflow-hidden rounded-[2rem] border border-white/20 bg-white/10 p-6 shadow-2xl backdrop-blur-2xl">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_10%,_rgba(99,102,241,.28),_transparent_40%)]" />
@@ -307,6 +337,16 @@ export function AutopayQueue() {
           </p>
           <p className="text-xs text-cyan-100">Pending items: {pendingCount}</p>
         </header>
+
+        <section className="rounded-2xl border border-white/20 bg-black/20 p-4">
+          <p className="text-xs uppercase tracking-[0.14em] text-white/65">Salary Batch Review</p>
+          <p className="mt-1 text-sm text-white/85">
+            {salaryDueToday.length} salary item(s) due today. Batch total: ${(salaryBatchTotal / 100).toFixed(2)}.
+          </p>
+          <p className="mt-1 text-xs text-white/65">
+            TreasuryGate attempts salary items with a shared thread approval context so approval can cover batch execution.
+          </p>
+        </section>
 
         <form onSubmit={onAddItem} className="grid gap-3 rounded-2xl border border-white/20 bg-black/20 p-4 sm:grid-cols-2">
           <label className="text-xs uppercase tracking-[0.14em] text-white/65">
