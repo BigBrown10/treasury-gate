@@ -235,7 +235,7 @@ export function TasksMonitor() {
           <button
             type="button"
             onClick={() => setActivePanel("scheduled")}
-            className="rounded-2xl border border-orange-100/25 bg-black/25 p-5 text-left transition hover:scale-[1.01] hover:border-orange-100/40"
+            className="rounded-2xl border border-orange-100/25 bg-black/25 p-5 text-left transition hover:-translate-y-0.5 hover:border-orange-100/40"
           >
             <p className="text-xs uppercase tracking-[0.14em] text-orange-100/75">Modal 01</p>
             <h3 className="mt-2 text-2xl font-semibold text-white">Scheduled</h3>
@@ -246,7 +246,7 @@ export function TasksMonitor() {
           <button
             type="button"
             onClick={() => setActivePanel("live")}
-            className="rounded-2xl border border-orange-100/25 bg-black/25 p-5 text-left transition hover:scale-[1.01] hover:border-orange-100/40"
+            className="rounded-2xl border border-orange-100/25 bg-black/25 p-5 text-left transition hover:-translate-y-0.5 hover:border-orange-100/40"
           >
             <p className="text-xs uppercase tracking-[0.14em] text-orange-100/75">Modal 02</p>
             <h3 className="mt-2 text-2xl font-semibold text-white">Live</h3>
@@ -257,7 +257,7 @@ export function TasksMonitor() {
           <button
             type="button"
             onClick={() => setActivePanel("finished")}
-            className="rounded-2xl border border-orange-100/25 bg-black/25 p-5 text-left transition hover:scale-[1.01] hover:border-orange-100/40"
+            className="rounded-2xl border border-orange-100/25 bg-black/25 p-5 text-left transition hover:-translate-y-0.5 hover:border-orange-100/40"
           >
             <p className="text-xs uppercase tracking-[0.14em] text-orange-100/75">Modal 03</p>
             <h3 className="mt-2 text-2xl font-semibold text-white">Finished</h3>
@@ -267,9 +267,9 @@ export function TasksMonitor() {
         </section>
 
         {activePanel && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-8 backdrop-blur-sm" onClick={() => setActivePanel(null)}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 px-4 py-8 backdrop-blur-md" onClick={() => setActivePanel(null)}>
             <article
-              className="modal-pop relative max-h-[85vh] w-full max-w-4xl overflow-auto rounded-3xl border border-orange-100/30 bg-gradient-to-b from-[#211011] to-[#160d15] p-6 shadow-[0_0_80px_rgba(255,110,70,.25)]"
+              className="modal-pop relative max-h-[85vh] w-full max-w-4xl overflow-auto rounded-3xl border border-orange-100/30 bg-gradient-to-b from-[#261215] to-[#160d15] p-6 shadow-[0_20px_80px_rgba(255,110,70,.24)]"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-3">
@@ -282,7 +282,7 @@ export function TasksMonitor() {
                 <button
                   type="button"
                   onClick={() => setActivePanel(null)}
-                  className="rounded-xl border border-orange-100/30 bg-white/5 px-3 py-1.5 text-xs uppercase tracking-[0.12em] text-orange-100 transition hover:bg-white/10"
+                  className="brand-push-btn-ghost px-3 py-1.5 text-xs uppercase tracking-[0.12em]"
                 >
                   Close
                 </button>

@@ -12,11 +12,11 @@ import {
 } from "@/lib/client/queue-store";
 
 export function ItemsManager() {
-  const [category, setCategory] = useState<QueueItem["category"]>("supplies");
-  const [vendor, setVendor] = useState("Vercel");
-  const [amount, setAmount] = useState("50");
-  const [dueDate, setDueDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [dueTime, setDueTime] = useState("09:00");
+  const [category, setCategory] = useState<QueueItem["category"] | "">("");
+  const [vendor, setVendor] = useState("");
+  const [amount, setAmount] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [dueTime, setDueTime] = useState("");
   const [autoCreateInvoice, setAutoCreateInvoice] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +33,16 @@ export function ItemsManager() {
   async function onAddItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+
+    if (!category) {
+      setError("Please choose a category.");
+      return;
+    }
+
+    if (!dueDate || !dueTime) {
+      setError("Please provide due date and time.");
+      return;
+    }
 
     const parsedAmount = Number.parseFloat(amount);
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
@@ -145,9 +155,12 @@ export function ItemsManager() {
             Category
             <select
               value={category}
-              onChange={(event) => setCategory(event.target.value as QueueItem["category"])}
-              className="mt-1 w-full rounded-xl border border-orange-100/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-orange-200/60"
+              onChange={(event) => setCategory(event.target.value as QueueItem["category"] | "")}
+              className="apple-input mt-1 w-full"
             >
+              <option value="" disabled>
+                Select category
+              </option>
               <option value="salary">Salary</option>
               <option value="supplies">Supplies</option>
               <option value="logistics">Logistics</option>
@@ -160,7 +173,8 @@ export function ItemsManager() {
             <input
               value={vendor}
               onChange={(event) => setVendor(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-orange-100/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-orange-200/60"
+              placeholder="e.g. Vercel, Payroll Team, Logistics Partner"
+              className="apple-input mt-1 w-full"
             />
           </label>
 
@@ -170,7 +184,7 @@ export function ItemsManager() {
               type="date"
               value={dueDate}
               onChange={(event) => setDueDate(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-orange-100/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-orange-200/60"
+              className="apple-input mt-1 w-full"
             />
           </label>
 
@@ -180,7 +194,7 @@ export function ItemsManager() {
               type="time"
               value={dueTime}
               onChange={(event) => setDueTime(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-orange-100/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-orange-200/60"
+              className="apple-input mt-1 w-full"
             />
           </label>
 
@@ -189,7 +203,8 @@ export function ItemsManager() {
             <input
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-orange-100/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-orange-200/60"
+              placeholder="e.g. 500.00"
+              className="apple-input mt-1 w-full"
             />
           </label>
 
@@ -205,7 +220,7 @@ export function ItemsManager() {
           <button
             type="submit"
             disabled={isAdding}
-            className="col-span-full inline-flex w-fit items-center justify-center rounded-xl border border-orange-200/60 bg-orange-300/20 px-4 py-2 text-sm font-medium text-orange-50 transition hover:bg-orange-300/30 disabled:cursor-not-allowed disabled:opacity-60"
+            className="brand-push-btn col-span-full inline-flex w-fit items-center justify-center px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isAdding ? "Creating..." : "Create New"}
           </button>
