@@ -185,6 +185,16 @@ export async function POST(request: NextRequest) {
     const env = getEnv();
     let slackApproval = match.metadata?.slack_approval;
 
+    if (slackApproval === "approve") {
+      slackApproval = "approved";
+      await updateInvoiceMetadata(match.id, { slack_approval: "approved" });
+    }
+
+    if (slackApproval === "deny") {
+      slackApproval = "denied";
+      await updateInvoiceMetadata(match.id, { slack_approval: "denied" });
+    }
+
     if (!slackApproval) {
       // 1. Mark as pending and wait for Slack flow.
       await updateInvoiceMetadata(match.id, { slack_approval: "pending" });
@@ -196,6 +206,7 @@ export async function POST(request: NextRequest) {
 
       if (env.SLACK_WEBHOOK_URL) {
         const slackPayload = {
+          text: `Approval requested for ${input.vendor} invoice ${match.id}`,
           blocks: [
             {
               type: "section",
@@ -210,12 +221,14 @@ export async function POST(request: NextRequest) {
                 {
                   type: "button",
                   text: { type: "plain_text", emoji: true, text: "Approve" },
+                  action_id: "approve_invoice",
                   style: "primary",
                   value: `approve|${match.id}`
                 },
                 {
                   type: "button",
                   text: { type: "plain_text", emoji: true, text: "Deny" },
+                  action_id: "deny_invoice",
                   style: "danger",
                   value: `deny|${match.id}`
                 }
@@ -272,6 +285,17 @@ export async function POST(request: NextRequest) {
         status: "denied",
         agentLogs: [...agentLogs, log("slack_approval_denied", "User clicked deny in Slack")],
         timeline: ["Payment was denied via Slack."]
+      });
+    }
+
+    if (slackApproval !== "approved") {
+      return NextResponse.json({
+        itemId: input.itemId,
+        threadId,
+        status: "awaiting_approval",
+        retryAfterSeconds: 8,
+        agentLogs: [...agentLogs, log("slack_approval_unknown", `Unexpected slack_approval=${slackApproval ?? "<empty>"}`)],
+        timeline: ["Waiting for Slack approval state to become approved..."]
       });
     }
 

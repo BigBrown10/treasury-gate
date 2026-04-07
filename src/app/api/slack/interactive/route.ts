@@ -3,17 +3,23 @@ import { updateInvoiceMetadata } from "@/lib/server/stripe";
 
 export async function POST(request: NextRequest) {
   try {
-    const text = await request.text();
-    const params = new URLSearchParams(text);
-    const payloadStr = params.get("payload");
+    const contentType = request.headers.get("content-type") ?? "";
+    let payload: Record<string, unknown>;
 
-    if (!payloadStr) {
-      return NextResponse.json({ error: "No payload provided text" }, { status: 400 });
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+      const text = await request.text();
+      const params = new URLSearchParams(text);
+      const payloadStr = params.get("payload");
+      if (!payloadStr) {
+        return NextResponse.json({ error: "No payload provided text" }, { status: 400 });
+      }
+      payload = JSON.parse(payloadStr) as Record<string, unknown>;
+    } else {
+      payload = (await request.json()) as Record<string, unknown>;
     }
 
-    const payload = JSON.parse(payloadStr);
-
-    const action = payload.actions?.[0];
+    const actions = (payload.actions as Array<Record<string, unknown>> | undefined) ?? [];
+    const action = actions[0];
     if (!action || !action.value) {
       return NextResponse.json({ ok: true });
     }
@@ -25,13 +31,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    const normalizedDecision =
+      actionType === "approve" ? "approved" : actionType === "deny" ? "denied" : null;
+
     // Set the decision as metadata on the Stripe invoice
     if (actionType === "approve" || actionType === "deny") {
-      await updateInvoiceMetadata(invoiceId, { slack_approval: actionType });
+      await updateInvoiceMetadata(invoiceId, { slack_approval: normalizedDecision! });
 
       return NextResponse.json({
         replace_original: true,
-        text: `*Status Update:* Payment has been ${actionType === "approve" ? "approved ✅" : "denied ❌"}\nInvoice: ${invoiceId}`
+        text: `*Status Update:* Payment has been ${normalizedDecision === "approved" ? "approved ✅" : "denied ❌"}\nInvoice: ${invoiceId}`
       });
     }
 
