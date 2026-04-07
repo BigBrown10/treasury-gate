@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
                   type: "section",
                   text: {
                     type: "mrkdwn",
-                    text: `🚨 *Auth0 CIBA Request Triggered*\n\nYou have a new request:\n*${input.vendor}*\nAmount: *$${(match.amountDue / 100).toFixed(2)}*\nInvoice: ${match.id}\nReason: ${match.description || 'Auto-generated task'}\n\n*Please check your Auth0 Guardian app to Approve or Deny this transaction.*`,
+                    text: `🚨 *Auth0 CIBA Request Triggered*\n\nYou have a new request:\n*${input.vendor}*\nAmount: *$${(match.amountDue / 100).toFixed(2)}*\nInvoice: ${match.id}\nReason: ${match.description || 'Auto-generated task'}\n\n*This Slack notification was securely orchestrated via Auth0 Extensibility! Please Approve or Deny.*`,
                   }
                 },
                 {

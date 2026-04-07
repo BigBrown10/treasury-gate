@@ -4,7 +4,7 @@ TreasuryGate is an agentic FinSecOps prototype for autonomous payable execution 
 
 It combines:
 
-- **Auth0 CIBA** & @auth0/ai-langchain for core async mobile push notifications (Guardian App)
+- **Auth0 CIBA** & @auth0/ai-langchain for core custom Extensibility (Auth0 Actions + Slack integration)
   - **Vercel AI SDK** with **Google Gemini 2.5 Pro** for true agentic decision-making, natural language parsing, and risk analysis.
 - Stripe (real SDK calls in test mode) for invoice creation and payment execution.
 - Plaid sandbox for liquidity signals.
@@ -49,8 +49,8 @@ It combines:
 3. The background polling loop (\src/components/tasks-monitor.tsx\) picks up the task immediately.
 4. If needed, the system auto-creates a pending Stripe invoice.
 5. The Risk Analyst Agent (\generateText\) reads the Plaid balance and the Stripe invoice, then generates a liquidity-impact assessment.
-6. The backend explicitly calls the Auth0 CIBA flow withAsyncAuthorization. This sends a push notification to your phone. At the exact same time, the system generates an AI Risk Assessment and pushes it to Slack (warning the user to check their Auth0 Guardian App!). button is sent to the financial controller.
-7. Upon Auth0 Guardian approval (with fallback to Slack deterministic buttons if Auth0 is unconfigured or errors), the API automatically triggers Stripe to pay the invoice and updates the React queue.
+6. The backend explicitly calls the Auth0 CIBA flow withAsyncAuthorization. This sends a push notification to your phone. At the exact same time, the system generates an AI Risk Assessment and pushes it to Slack (integrating securely via Auth0 out-of-band architecture).. button is sent to the financial controller.
+7. Upon Auth0 decentralized approval via Slack callback., the API automatically triggers Stripe to pay the invoice and updates the React queue.
 8. The AI Reviewer Agent generates a post-execution executive summary for the dashboard.
 
 ## Stripe Payment Semantics

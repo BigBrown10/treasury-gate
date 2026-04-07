@@ -121,7 +121,7 @@ export function mapAuth0InterruptToStatus(error: unknown): {
   if (AuthorizationPendingInterrupt.isInterrupt(error)) {
     return {
       status: "awaiting_approval",
-      message: "Authorization pending. Approve the push notification in your Auth0 Guardian app.",
+      message: "Authorization pending. Awaiting decentralized approval via Slack (via Auth0 Action).",
       retryAfterSeconds: 5,
     };
   }
