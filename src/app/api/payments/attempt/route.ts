@@ -206,13 +206,12 @@ export async function POST(request: NextRequest) {
 
       if (env.SLACK_WEBHOOK_URL) {
         const slackPayload = {
-          text: `Approval requested for ${input.vendor} invoice ${match.id}`,
           blocks: [
             {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `You have a new request:\n*${input.vendor}*\nAmount: *$${(match.amountDue / 100).toFixed(2)}*\nInvoice: ${match.id}`
+                text: `You have a new request:\n*${input.vendor}*\nAmount: *$${(match.amountDue / 100).toFixed(2)}*\nInvoice: ${match.id}\nReason: ${match.description || "Auto-generated task"}`
               }
             },
             {
@@ -221,14 +220,12 @@ export async function POST(request: NextRequest) {
                 {
                   type: "button",
                   text: { type: "plain_text", emoji: true, text: "Approve" },
-                  action_id: "approve_invoice",
                   style: "primary",
                   value: `approve|${match.id}`
                 },
                 {
                   type: "button",
                   text: { type: "plain_text", emoji: true, text: "Deny" },
-                  action_id: "deny_invoice",
                   style: "danger",
                   value: `deny|${match.id}`
                 }
