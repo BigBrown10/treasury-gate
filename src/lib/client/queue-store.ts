@@ -90,7 +90,16 @@ export function nowIso(): string {
 }
 
 export function canAutoProcess(item: QueueItem): boolean {
-  return ["queued", "waiting_invoice", "awaiting_approval", "payment_unverified"].includes(item.status);
+  return [
+    "queued",
+    "waiting_invoice",
+    "awaiting_approval",
+    "payment_unverified",
+    "error",
+    "timed_out",
+    "insufficient_funds",
+    "denied"
+  ].includes(item.status);
 }
 
 export function isDueNow(item: QueueItem): boolean {
@@ -103,7 +112,16 @@ export function isDueToday(item: QueueItem): boolean {
 }
 
 export function isLiveStatus(item: QueueItem): boolean {
-  return ["queued", "waiting_invoice", "awaiting_approval", "payment_unverified"].includes(item.status);
+  return [
+    "queued",
+    "waiting_invoice",
+    "awaiting_approval",
+    "payment_unverified",
+    "error",
+    "timed_out",
+    "insufficient_funds",
+    "denied"
+  ].includes(item.status);
 }
 
 function cap<T>(entries: T[], max: number): T[] {

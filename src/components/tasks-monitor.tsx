@@ -467,6 +467,11 @@ export function TasksMonitor() {
                     <div className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] ${getApprovalState(item).tone}`}>
                       {getApprovalState(item).label}
                     </div>
+                    {item.status === "error" && (
+                      <div className="mt-2 text-xs font-medium text-red-300">
+                        Error: {item.timeline[item.timeline.length - 1]}
+                      </div>
+                    )}
                     <p className="mt-1 text-xs text-white/75">Due: {new Date(item.dueAt).toLocaleString()}</p>
                     {item.nextAttemptAt && new Date(item.nextAttemptAt).getTime() > Date.now() && (
                       <p className="text-xs text-white/75">Next retry: {new Date(item.nextAttemptAt).toLocaleString()}</p>
