@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    let paymentResultRaw = await getExecuteVendorPaymentTool().invoke({
+    let paymentResultRaw: unknown = await getExecuteVendorPaymentTool().invoke({
       invoiceId: match.id,
       expectedAmountCents: match.amountDue,
       userId,
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
       if (rawAsAny && typeof rawAsAny === "object" && rawAsAny.code === "ASYNC_AUTHORIZATION_USER_DOES_NOT_HAVE_PUSH_NOTIFICATIONS") {
         throw new Error("Auth0 needs Guardian Push Notifications enabled.");
       }
-      throw paymentResultRaw;
+      throw paymentResultRaw instanceof Error ? paymentResultRaw : new Error(String(paymentResultRaw));
     }
 
     let evidence = await getInvoicePaymentEvidence(match.id);
