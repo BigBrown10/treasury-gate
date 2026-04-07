@@ -190,6 +190,10 @@ export async function POST(request: NextRequest) {
       await updateInvoiceMetadata(match.id, { slack_approval: "pending" });
       slackApproval = "pending";
 
+      if (!env.SLACK_WEBHOOK_URL) {
+        throw new Error("SLACK_WEBHOOK_URL is not configured. Slack approval cannot be requested.");
+      }
+
       if (env.SLACK_WEBHOOK_URL) {
         const slackPayload = {
           blocks: [
@@ -220,15 +224,15 @@ export async function POST(request: NextRequest) {
           ]
         };
 
-        await fetch(env.SLACK_WEBHOOK_URL, {
+        const slackResponse = await fetch(env.SLACK_WEBHOOK_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(slackPayload)
         });
-      } else {
-        // If they did not set the webhook URL yet, automatically bypass the slack wait block so the hackathon flow still works
-        slackApproval = "approved";
-        await updateInvoiceMetadata(match.id, { slack_approval: "approved" });
+
+        if (!slackResponse.ok) {
+          throw new Error(`Slack webhook request failed with status ${slackResponse.status}.`);
+        }
       }
 
       if (slackApproval === "pending") {
