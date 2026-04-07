@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
-  getExecuteVendorPaymentTool,
   getBankBalanceTool,
   getPendingInvoicesTool,
-  mapAuth0InterruptToStatus,
 } from "@/lib/agent/tools";
 import { getInvoiceById, getInvoicePaymentEvidence, payInvoice, updateInvoiceMetadata } from "@/lib/server/stripe";
 import { getEnv } from "@/lib/server/env";
@@ -274,26 +272,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Now we execute directly if it was approved
-    let paymentResultRaw;
     try {
-      paymentResultRaw = await payInvoice(match.id, threadId ? `treasurygate-${threadId}-${match.id}` : undefined);
+      await payInvoice(match.id, threadId ? `treasurygate-${threadId}-${match.id}` : undefined);
     } catch (payErr) {
-      paymentResultRaw = payErr;
-    }
-
-    if (
-      paymentResultRaw instanceof Error ||
-      (paymentResultRaw && typeof paymentResultRaw === "object" && "code" in paymentResultRaw) ||
-      (typeof paymentResultRaw === "string" && paymentResultRaw.includes("AUTH0_AI_INTERRUPT"))
-    ) {
-      if (typeof paymentResultRaw === "string" && paymentResultRaw.includes("DOES_NOT_HAVE_PUSH_NOTIFICATIONS")) {
-        throw new Error("Auth0 requires Guardian push notifications set up on your device.");
-      }
-      const rawAsAny = paymentResultRaw as Record<string, unknown>;
-      if (rawAsAny && typeof rawAsAny === "object" && rawAsAny.code === "ASYNC_AUTHORIZATION_USER_DOES_NOT_HAVE_PUSH_NOTIFICATIONS") {
-        throw new Error("Auth0 needs Guardian Push Notifications enabled.");
-      }
-      throw paymentResultRaw instanceof Error ? paymentResultRaw : new Error(String(paymentResultRaw));
+      throw payErr instanceof Error ? payErr : new Error(String(payErr));
     }
 
     let evidence = await getInvoicePaymentEvidence(match.id);
@@ -311,7 +293,7 @@ export async function POST(request: NextRequest) {
     // run one additional execute attempt (idempotent) and re-check.
     if (!evidence.verifiedPaid) {
       try {
-        paymentResultRaw = await payInvoice(match.id, threadId ? `treasurygate-${threadId}-${match.id}-retry` : undefined);
+        await payInvoice(match.id, threadId ? `treasurygate-${threadId}-${match.id}-retry` : undefined);
       } catch (e) {}
 
       for (let attempt = 0; attempt < EVIDENCE_RETRY_ATTEMPTS; attempt += 1) {
@@ -357,21 +339,7 @@ export async function POST(request: NextRequest) {
       ],
     });
   } catch (error) {
-    const mapped = mapAuth0InterruptToStatus(error);
-    if (mapped) {
-      return NextResponse.json(
-        {
-          threadId,
-          status: mapped.status,
-          timeline: [mapped.message],
-          agentLogs: [log("authorization_state", mapped.message)],
-          retryAfterSeconds: mapped.retryAfterSeconds,
-        },
-        { status: 202 },
-      );
-    }
-
     const message = error instanceof Error ? error.message : typeof error === "object" && error && "code" in error ? String((error as Record<string, unknown>).code || "Unknown code") : "Unknown payment attempt error";
-    return NextResponse.json({ status: "timed_out", error: message }, { status: 500 });
+    return NextResponse.json({ status: "error", error: message }, { status: 500 });
   }
 }
