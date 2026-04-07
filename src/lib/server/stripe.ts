@@ -14,6 +14,7 @@ export type PendingInvoice = {
   hostedInvoiceUrl: string | null;
   status: Stripe.Invoice.Status | null;
   createdAt: string;
+  metadata?: Record<string, string>;
 };
 
 export type CreateInvoiceInput = {
@@ -88,6 +89,7 @@ function normalizeInvoice(invoice: Stripe.Invoice): PendingInvoice {
     hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
     status: invoice.status,
     createdAt: new Date(invoice.created * 1000).toISOString(),
+    metadata: invoice.metadata ?? undefined,
   };
 }
 
@@ -102,6 +104,12 @@ export async function getPendingInvoices(): Promise<PendingInvoice[]> {
   });
 
   return result.data.map((invoice) => normalizeInvoice(invoice));
+}
+
+export async function updateInvoiceMetadata(invoiceId: string, metadata: Record<string, string>): Promise<PendingInvoice> {
+  const stripe = getStripeClient();
+  const invoice = await stripe.invoices.update(invoiceId, { metadata });
+  return normalizeInvoice(invoice);
 }
 
 export async function getInvoiceById(invoiceId: string): Promise<PendingInvoice> {

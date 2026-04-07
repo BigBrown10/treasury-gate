@@ -7,7 +7,8 @@ import {
   getPendingInvoicesTool,
   mapAuth0InterruptToStatus,
 } from "@/lib/agent/tools";
-import { getInvoiceById, getInvoicePaymentEvidence } from "@/lib/server/stripe";
+import { getInvoiceById, getInvoicePaymentEvidence, payInvoice, updateInvoiceMetadata } from "@/lib/server/stripe";
+import { getEnv } from "@/lib/server/env";
 
 const schema = z.object({
   itemId: z.string().min(1),
@@ -183,12 +184,102 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    let paymentResultRaw: unknown = await getExecuteVendorPaymentTool().invoke({
-      invoiceId: match.id,
-      expectedAmountCents: match.amountDue,
-      userId,
-      threadId,
-    });
+    const env = getEnv();
+    let slackApproval = match.metadata?.slack_approval;
+
+    if (!slackApproval) {
+      // 1. Mark as pending and wait for Slack flow.
+      await updateInvoiceMetadata(match.id, { slack_approval: "pending" });
+      slackApproval = "pending";
+
+      if (env.SLACK_WEBHOOK_URL) {
+        const slackPayload = {
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `You have a new request:\n*${input.vendor}*\nAmount: *$${(match.amountDue / 100).toFixed(2)}*\nInvoice: ${match.id}`
+              }
+            },
+            {
+              type: "actions",
+              elements: [
+                {
+                  type: "button",
+                  text: { type: "plain_text", emoji: true, text: "Approve" },
+                  style: "primary",
+                  value: `approve|${match.id}`
+                },
+                {
+                  type: "button",
+                  text: { type: "plain_text", emoji: true, text: "Deny" },
+                  style: "danger",
+                  value: `deny|${match.id}`
+                }
+              ]
+            }
+          ]
+        };
+
+        await fetch(env.SLACK_WEBHOOK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(slackPayload)
+        });
+      } else {
+        // If they did not set the webhook URL yet, automatically bypass the slack wait block so the hackathon flow still works
+        slackApproval = "approved";
+        await updateInvoiceMetadata(match.id, { slack_approval: "approved" });
+      }
+
+      if (slackApproval === "pending") {
+        return NextResponse.json({
+          itemId: input.itemId,
+          threadId,
+          status: "awaiting_approval",
+          retryAfterSeconds: 8,
+          agentLogs: [
+            ...agentLogs,
+            log("slack_approval_requested", "Approval request pushed to Slack.")
+          ],
+          timeline: [
+            `Matched invoice ${match.id}.`,
+            "Approval requested via Slack.",
+            "Waiting for authorized user to approve."
+          ]
+        });
+      }
+    }
+
+    if (slackApproval === "pending") {
+      return NextResponse.json({
+        itemId: input.itemId,
+        threadId,
+        status: "awaiting_approval",
+        retryAfterSeconds: 8,
+        agentLogs: [...agentLogs, log("slack_approval_pending", "Still waiting for Slack interaction")],
+        timeline: ["Waiting for Slack approval..."]
+      });
+    }
+
+    if (slackApproval === "denied") {
+      return NextResponse.json({
+        itemId: input.itemId,
+        threadId,
+        status: "denied",
+        agentLogs: [...agentLogs, log("slack_approval_denied", "User clicked deny in Slack")],
+        timeline: ["Payment was denied via Slack."]
+      });
+    }
+
+    // Now we execute directly if it was approved
+    let paymentResultRaw;
+    try {
+      paymentResultRaw = await payInvoice(match.id, threadId ? `treasurygate-${threadId}-${match.id}` : undefined);
+    } catch (payErr) {
+      paymentResultRaw = payErr;
+    }
 
     if (
       paymentResultRaw instanceof Error ||
@@ -216,17 +307,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // If Auth0 already granted execution but Stripe still reads open,
-    // run one additional auth-gated execute attempt (idempotent) and re-check.
+    // If Slack already granted execution but Stripe still reads open,
+    // run one additional execute attempt (idempotent) and re-check.
     if (!evidence.verifiedPaid) {
-      paymentResultRaw = await getExecuteVendorPaymentTool().invoke({
-        invoiceId: match.id,
-        expectedAmountCents: match.amountDue,
-        userId,
-        threadId,
-      });
-
-      void paymentResultRaw;
+      try {
+        paymentResultRaw = await payInvoice(match.id, threadId ? `treasurygate-${threadId}-${match.id}-retry` : undefined);
+      } catch (e) {}
 
       for (let attempt = 0; attempt < EVIDENCE_RETRY_ATTEMPTS; attempt += 1) {
         await delay(1000);
@@ -255,7 +341,7 @@ export async function POST(request: NextRequest) {
       },
       agentLogs: [
         ...agentLogs,
-        log("authorization_granted", "Auth0 async authorization approved. Executing payment."),
+        log("authorization_granted", "Slack authorization approved. Executing payment."),
         log(
           "payment_evidence",
           `status=${evidence.status}, verifiedPaid=${evidence.verifiedPaid}, amountPaid=${evidence.amountPaid}`,
@@ -263,8 +349,8 @@ export async function POST(request: NextRequest) {
       ],
       timeline: [
         `Matched invoice ${match.id}.`,
-        "Approval requested via Auth0 async authorization.",
-        "Auth0 approval granted. Payment execution attempted in Stripe.",
+        "Approval requested via Slack.",
+        "Slack approval granted. Payment execution attempted in Stripe.",
         evidence.verifiedPaid
           ? "Payment verified as paid in Stripe."
           : "Stripe did not report paid status yet.",

@@ -14,6 +14,7 @@ const envSchema = z.object({
   PLAID_ACCESS_TOKEN: z.string().optional(),
   STRIPE_INVOICE_LIMIT: z.coerce.number().int().positive().default(25),
   PLAID_SANDBOX_INSTITUTION_ID: z.string().default("ins_109508"),
+  SLACK_WEBHOOK_URL: z.string().optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
