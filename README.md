@@ -20,13 +20,15 @@ It combines:
 
 ## Architecture Overview
 
-### Serverless Event-Driven Architecture (Headless System of Record)
-We intentionally avoided building a monolithic SQL database. Instead, this platform is architected as an event-driven orchestrator. By decoupling the data layer into enterprise microservices, we process everything statelessly via Next.js Serverless Edge Functions:
-- **Stripe** acts as our Financial System of Record (handling invoice states and payment ledgers).
+### Serverless Event-Driven Architecture
+Our Next.js API acts as our serverless orchestration layer handling the heavy lifting with Auth0 and Stripe. For the task queue state, we deliberately decoupled it to client-side local storage for this demo sprint. 
+
+We made a strategic product decision to spend our hackathon hours perfecting the complex Auth0 Extensibility authorization loop, AI agentic workflows, and Plaid integrations rather than wrestling with database migrations. Because the architecture is highly modular, swapping that client-side state for a durable database (like Postgres) is a pragmatic day-two ticket.
+
+- **Stripe** acts as our Financial System of Record (handling actual invoice states and payment ledgers).
 - **Plaid** acts as our real-time liquidity truth layer.
-- **Auth0** handles our identity and approval state.
-- **Next.js API Routes** act as our serverless backend.
-This allows the platform to scale instantly without bottlenecking on database connections.
+- **Auth0** handles our identity and approval workflows.
+- **Next.js API Routes** act as our secure serverless backend for Node.js execution.
 
 ### Frontend (Next.js App Router)
 - / landing and product narrative.
@@ -95,4 +97,5 @@ npm run dev
 \\\
 
 Open \http://localhost:3000\.
+
 
