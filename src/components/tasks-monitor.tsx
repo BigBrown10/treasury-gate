@@ -92,6 +92,7 @@ export function TasksMonitor() {
   const [activePanel, setActivePanel] = useState<TaskPanel>(null);
   const [reviewsByItemId, setReviewsByItemId] = useState<Record<string, AiReview>>({});
   const [reviewLoading, setReviewLoading] = useState<Record<string, boolean>>({});
+  const [executingItems, setExecutingItems] = useState<Record<string, boolean>>({});
   const isProcessingRef = useRef(false);
 
   useEffect(() => {
@@ -109,6 +110,7 @@ export function TasksMonitor() {
     }
 
     isProcessingRef.current = true;
+    setExecutingItems((current) => ({ ...current, [item.id]: true }));
 
     try {
       let invoiceId = item.invoiceId;
@@ -262,6 +264,7 @@ export function TasksMonitor() {
       );
     } finally {
       isProcessingRef.current = false;
+      setExecutingItems((current) => ({ ...current, [item.id]: false }));
     }
   }
 
@@ -477,9 +480,10 @@ export function TasksMonitor() {
                       <button
                         type="button"
                         onClick={() => void processItem(item)}
-                        className="mt-2 inline-flex rounded-full border border-orange-100/35 bg-orange-200/15 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-orange-100 transition hover:bg-orange-200/25"
+                        disabled={executingItems[item.id]}
+                        className="mt-2 inline-flex rounded-full border border-orange-100/35 bg-orange-200/15 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-orange-100 transition hover:bg-orange-200/25 disabled:opacity-50"
                       >
-                        Run Now
+                        {executingItems[item.id] ? "Running..." : "Run Now"}
                       </button>
                     )}
 

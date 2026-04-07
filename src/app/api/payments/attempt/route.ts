@@ -190,7 +190,19 @@ export async function POST(request: NextRequest) {
       threadId,
     });
 
-    void paymentResultRaw;
+    if (
+      paymentResultRaw instanceof Error ||
+      (paymentResultRaw && typeof paymentResultRaw === "object" && paymentResultRaw.code) ||
+      (typeof paymentResultRaw === "string" && paymentResultRaw.includes("AUTH0_AI_INTERRUPT"))
+    ) {
+      if (typeof paymentResultRaw === "string" && paymentResultRaw.includes("DOES_NOT_HAVE_PUSH_NOTIFICATIONS")) {
+        throw new Error("Auth0 requires Guardian push notifications set up on your device.");
+      }
+      if (paymentResultRaw && typeof paymentResultRaw === "object" && paymentResultRaw.code === "ASYNC_AUTHORIZATION_USER_DOES_NOT_HAVE_PUSH_NOTIFICATIONS") {
+        throw new Error("Auth0 needs Guardian Push Notifications enabled.");
+      }
+      throw paymentResultRaw;
+    }
 
     let evidence = await getInvoicePaymentEvidence(match.id);
     if (!evidence.verifiedPaid) {
@@ -272,7 +284,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const message = error instanceof Error ? error.message : "Unknown payment attempt error";
+    const message = error instanceof Error ? error.message : typeof error === "object" && error && "code" in error ? String((error as any).code || "Unknown code") : "Unknown payment attempt error";
     return NextResponse.json({ status: "timed_out", error: message }, { status: 500 });
   }
 }
