@@ -92,7 +92,34 @@ export function TasksMonitor() {
   const [activePanel, setActivePanel] = useState<TaskPanel>(null);
   const [reviewsByItemId, setReviewsByItemId] = useState<Record<string, AiReview>>({});
   const [reviewLoading, setReviewLoading] = useState<Record<string, boolean>>({});
+  const [prompt, setPrompt] = useState("");
+  const [parsing, setParsing] = useState(false);
   const isProcessingRef = useRef(false);
+
+  async function handleAIAssistant(e: React.FormEvent) {
+    e.preventDefault();
+    if (!prompt.trim() || parsing) return;
+
+    setParsing(true);
+    try {
+      const response = await fetch("/api/tasks/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await response.json();
+      if (data.task) {
+        setItems(current => [data.task, ...current]);
+        setPrompt("");
+      } else {
+        alert("Failed to parse via AI: " + JSON.stringify(data));
+      }
+    } catch (err) {
+      alert("Error connecting to Agentic Parser.");
+    } finally {
+      setParsing(false);
+    }
+  }
 
   useEffect(() => {
     setItems(loadQueueItems());
@@ -390,10 +417,34 @@ export function TasksMonitor() {
     <section className="relative overflow-hidden rounded-[2rem] border border-orange-100/20 bg-white/10 p-6 shadow-2xl backdrop-blur-2xl">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_8%,_rgba(251,146,60,.28),_transparent_40%)]" />
       <div className="relative space-y-6">
-        <header className="space-y-1">
-          <p className="text-xs uppercase tracking-[0.18em] text-orange-100/85">Tasks</p>
-          <h2 className="text-3xl font-semibold text-white">Task Modal Console</h2>
-          <p className="text-sm text-white/75">Open each panel as a popup modal: Scheduled, Live, and Finished.</p>
+<header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="space-y-1">
+              <p className="text-xs uppercase tracking-[0.18em] text-orange-100/85">Tasks</p>
+              <h2 className="text-3xl font-semibold text-white">Task Modal Console</h2>
+              <p className="text-sm text-white/75">Open each panel as a popup modal: Scheduled, Live, and Finished.</p>
+            </div>
+            
+            <form onSubmit={handleAIAssistant} className="flex-1 max-w-sm flex items-center relative">
+              <input 
+                type="text" 
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Agent: 'Pay $500 to Adobe next Friday...'" 
+                className="w-full bg-black/25 text-white placeholder-white/30 text-sm py-3 px-4 rounded-xl border border-orange-100/25 focus:outline-none focus:border-orange-100/50 transition pr-12 shadow-inner"
+                disabled={parsing}
+              />
+              <button 
+                type="submit" 
+                disabled={parsing}
+                className="absolute right-2 p-1.5 text-white/75 hover:text-white transition disabled:opacity-50"
+              >
+                {parsing ? (
+                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                ) : (
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
+                )}
+              </button>
+            </form>
         </header>
 
         <section className="grid gap-4 md:grid-cols-3">

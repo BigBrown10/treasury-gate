@@ -6,7 +6,9 @@ import {
   getPendingInvoicesTool,
 } from "@/lib/agent/tools";
 import { getInvoiceById, getInvoicePaymentEvidence, payInvoice, updateInvoiceMetadata } from "@/lib/server/stripe";
-import { getEnv } from "@/lib/server/env";
+import { getEnv, hasGeminiKey } from "@/lib/server/env";
+import { generateText } from "ai";
+import { google } from "@ai-sdk/google";
 
 const schema = z.object({
   itemId: z.string().min(1),
@@ -205,6 +207,20 @@ export async function POST(request: NextRequest) {
       }
 
       if (env.SLACK_WEBHOOK_URL) {
+        let aiRiskAssessment = "Automated payment request ready for human review.";
+
+        if (hasGeminiKey()) {
+          try {
+            const { text } = await generateText({
+              model: google("gemini-2.5-pro"),
+              prompt: `Act as a corporate treasury risk director. We have an outgoing payment request for $${(match.amountDue / 100).toFixed(2)} to vendor "${input.vendor}". Our current Plaid confirmed bank balance is $${balance.available}. Provide a 1-2 sentence snappy risk assessment. Emphasize liquidity impact if high. Keep it brief.`,
+            });
+            aiRiskAssessment = `*🤖 AI Risk Assessment:*\n${text.replace(/\*/g, '')}`;
+          } catch (e) {
+            aiRiskAssessment = "*🤖 AI Risk Assessment:*\nFailed to generate report.";
+          }
+        }
+
         const slackPayload = {
           blocks: [
             {
@@ -212,6 +228,13 @@ export async function POST(request: NextRequest) {
               text: {
                 type: "mrkdwn",
                 text: `You have a new request:\n*${input.vendor}*\nAmount: *$${(match.amountDue / 100).toFixed(2)}*\nInvoice: ${match.id}\nReason: ${match.description || "Auto-generated task"}`
+              }
+            },
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: aiRiskAssessment
               }
             },
             {
