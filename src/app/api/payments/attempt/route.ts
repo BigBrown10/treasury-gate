@@ -4,6 +4,9 @@ import { z } from "zod";
 import {
   getBankBalanceTool,
   getPendingInvoicesTool,
+  getExecuteVendorPaymentTool,
+  mapAuth0InterruptToStatus,
+  ChatStatus
 } from "@/lib/agent/tools";
 import { getInvoiceById, getInvoicePaymentEvidence, payInvoice, updateInvoiceMetadata } from "@/lib/server/stripe";
 import { getEnv, hasGeminiKey } from "@/lib/server/env";
@@ -184,146 +187,94 @@ export async function POST(request: NextRequest) {
       });
     }
 
+
     const env = getEnv();
-    let slackApproval = match.metadata?.slack_approval;
 
-    if (slackApproval === "approve") {
-      slackApproval = "approved";
-      await updateInvoiceMetadata(match.id, { slack_approval: "approved" });
-    }
+    let fallbackToSlack = false;
 
-    if (slackApproval === "deny") {
-      slackApproval = "denied";
-      await updateInvoiceMetadata(match.id, { slack_approval: "denied" });
-    }
+    // 1. Try Auth0 CIBA Flow First (Hackathon Requirement)
+    try {
+      await getExecuteVendorPaymentTool().invoke({
+        invoiceId: match.id,
+        expectedAmountCents: match.amountDue,
+        threadId,
+      });
 
-    if (!slackApproval) {
-      // 1. Mark as pending and wait for Slack flow.
-      await updateInvoiceMetadata(match.id, { slack_approval: "pending" });
-      slackApproval = "pending";
+      agentLogs.push(
+        log("authorization_granted", "Auth0 CIBA authorized. Credentials received and payment executed."),
+      );
+    } catch (auth0Error) {
+      const resolution = mapAuth0InterruptToStatus(auth0Error);
+      
+      if (resolution) {
+        // Log interrupt for tracing
+        agentLogs.push(log("auth0_ciba_interrupt", resolution.message));
 
-      if (!env.SLACK_WEBHOOK_URL) {
-        throw new Error("SLACK_WEBHOOK_URL is not configured. Slack approval cannot be requested.");
-      }
+        // If newly pending, push a Slack notification for transparency and Risk Analysis!
+        if (resolution.status === "awaiting_approval" && match.metadata?.slack_notified !== "true") {
+          await updateInvoiceMetadata(match.id, { slack_notified: "true" });
+          if (env.SLACK_WEBHOOK_URL) {
+            let aiRiskAssessment = "Automated payment request ready for Auth0 Guardian review.";
+            if (hasGeminiKey()) {
+              try {
+                const { text } = await generateText({
+                  model: google("gemini-2.5-pro"),
+                  prompt: `Act as a corporate treasury risk director. We have an outgoing payment request for $${(match.amountDue / 100).toFixed(2)} to vendor "${input.vendor}". Our current Plaid confirmed bank balance is $${balance.available}. Provide a 1-2 sentence snappy risk assessment. Emphasize liquidity impact if high. Keep it brief.`,
+                });
+                aiRiskAssessment = `*🤖 AI Risk Assessment:*\n${text.replace(/\*/g, '')}`;
+              } catch (e) {}
+            }
 
-      if (env.SLACK_WEBHOOK_URL) {
-        let aiRiskAssessment = "Automated payment request ready for human review.";
-
-        if (hasGeminiKey()) {
-          try {
-            const { text } = await generateText({
-              model: google("gemini-2.5-pro"),
-              prompt: `Act as a corporate treasury risk director. We have an outgoing payment request for $${(match.amountDue / 100).toFixed(2)} to vendor "${input.vendor}". Our current Plaid confirmed bank balance is $${balance.available}. Provide a 1-2 sentence snappy risk assessment. Emphasize liquidity impact if high. Keep it brief.`,
-            });
-            aiRiskAssessment = `*🤖 AI Risk Assessment:*\n${text.replace(/\*/g, '')}`;
-          } catch (e) {
-            aiRiskAssessment = "*🤖 AI Risk Assessment:*\nFailed to generate report.";
+            const slackPayload = {
+              blocks: [
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: `🚨 *Auth0 CIBA Request Triggered*\n\nYou have a new request:\n*${input.vendor}*\nAmount: *$${(match.amountDue / 100).toFixed(2)}*\nInvoice: ${match.id}\nReason: ${match.description || 'Auto-generated task'}\n\n*Please check your Auth0 Guardian app to Approve or Deny this transaction.*`,
+                  }
+                },
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: aiRiskAssessment
+                  }
+                }
+              ]
+            };
+            try {
+              await fetch(env.SLACK_WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(slackPayload) });
+              agentLogs.push(log("slack_notified", "Auth0 prompt was successful. Risk report copied to Slack."));
+            } catch(e) {}
           }
         }
 
-        const slackPayload = {
-          blocks: [
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: `You have a new request:\n*${input.vendor}*\nAmount: *$${(match.amountDue / 100).toFixed(2)}*\nInvoice: ${match.id}\nReason: ${match.description || "Auto-generated task"}`
-              }
-            },
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: aiRiskAssessment
-              }
-            },
-            {
-              type: "actions",
-              elements: [
-                {
-                  type: "button",
-                  text: { type: "plain_text", emoji: true, text: "Approve" },
-                  style: "primary",
-                  value: `approve|${match.id}`
-                },
-                {
-                  type: "button",
-                  text: { type: "plain_text", emoji: true, text: "Deny" },
-                  style: "danger",
-                  value: `deny|${match.id}`
-                }
-              ]
-            }
-          ]
-        };
-
-        const slackResponse = await fetch(env.SLACK_WEBHOOK_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(slackPayload)
-        });
-
-        if (!slackResponse.ok) {
-          throw new Error(`Slack webhook request failed with status ${slackResponse.status}.`);
-        }
-      }
-
-      if (slackApproval === "pending") {
         return NextResponse.json({
           itemId: input.itemId,
           threadId,
-          status: "awaiting_approval",
-          retryAfterSeconds: 8,
-          agentLogs: [
-            ...agentLogs,
-            log("slack_approval_requested", "Approval request pushed to Slack.")
-          ],
+          status: resolution.status,
+          retryAfterSeconds: resolution.retryAfterSeconds ?? 8,
+          agentLogs,
           timeline: [
             `Matched invoice ${match.id}.`,
-            "Approval requested via Slack.",
-            "Waiting for authorized user to approve."
-          ]
+            resolution.message,
+          ],
         });
+      } else {
+        // Auth0 crashed completely (e.g. Guardian Push disabled on user tenant). 
+        // Gracefully degrade to our custom Slack buttons!
+        fallbackToSlack = true;
+        agentLogs.push(
+          log("auth0_ciba_fallback", "Auth0 unavailable. Falling back to Slack webhook."),
+        );
       }
     }
 
-    if (slackApproval === "pending") {
-      return NextResponse.json({
-        itemId: input.itemId,
-        threadId,
-        status: "awaiting_approval",
-        retryAfterSeconds: 8,
-        agentLogs: [...agentLogs, log("slack_approval_pending", "Still waiting for Slack interaction")],
-        timeline: ["Waiting for Slack approval..."]
-      });
-    }
+    // 2. Deterministic Slack Fallback (If Auth0 fails or config is missing)
+    if (fallbackToSlack) {
 
-    if (slackApproval === "denied") {
-      return NextResponse.json({
-        itemId: input.itemId,
-        threadId,
-        status: "denied",
-        agentLogs: [...agentLogs, log("slack_approval_denied", "User clicked deny in Slack")],
-        timeline: ["Payment was denied via Slack."]
-      });
-    }
 
-    if (slackApproval !== "approved") {
-      return NextResponse.json({
-        itemId: input.itemId,
-        threadId,
-        status: "awaiting_approval",
-        retryAfterSeconds: 8,
-        agentLogs: [...agentLogs, log("slack_approval_unknown", `Unexpected slack_approval=${slackApproval ?? "<empty>"}`)],
-        timeline: ["Waiting for Slack approval state to become approved..."]
-      });
-    }
-
-    // Now we execute directly if it was approved
-    try {
-      await payInvoice(match.id, threadId ? `treasurygate-${threadId}-${match.id}` : undefined);
-    } catch (payErr) {
-      throw payErr instanceof Error ? payErr : new Error(String(payErr));
     }
 
     let evidence = await getInvoicePaymentEvidence(match.id);

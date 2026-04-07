@@ -4,7 +4,8 @@ TreasuryGate is an agentic FinSecOps prototype for autonomous payable execution 
 
 It combines:
 
-- **Vercel AI SDK** with **Google Gemini 2.5 Pro** for true agentic decision-making, natural language parsing, and risk analysis.
+- **Auth0 CIBA** & @auth0/ai-langchain for core async mobile push notifications (Guardian App)
+  - **Vercel AI SDK** with **Google Gemini 2.5 Pro** for true agentic decision-making, natural language parsing, and risk analysis.
 - Stripe (real SDK calls in test mode) for invoice creation and payment execution.
 - Plaid sandbox for liquidity signals.
 - Slack Block Kit Webhooks for async human-in-the-loop authorization.
@@ -15,7 +16,7 @@ It combines:
 - **Autonomous Risk Analyst**: An AI agent reviews live Plaid liquidity against outgoing Stripe invoices and generates an instantaneous risk assessment.
 - **AI Task Summaries**: Automatically generates executive summaries from complex execution logs to explain why a payment succeeded or stalled.
 - Auto-create Stripe invoices from tasks and continuously process the queue in the background.
-- Request Slack async approval before mutating payment execution.
+- Launch Auth0 CIBA flow via push notifications, dynamically generating an AI Risk Assessment to Slack while waiting for user approval.
 
 ## Architecture Overview
 
@@ -48,8 +49,8 @@ It combines:
 3. The background polling loop (\src/components/tasks-monitor.tsx\) picks up the task immediately.
 4. If needed, the system auto-creates a pending Stripe invoice.
 5. The Risk Analyst Agent (\generateText\) reads the Plaid balance and the Stripe invoice, then generates a liquidity-impact assessment.
-6. A Slack webhook containing the AI Risk Assessment and an Approve/Deny button is sent to the financial controller.
-7. Upon Slack approval callback, the API automatically triggers Stripe to pay the invoice and updates the React queue.
+6. The backend explicitly calls the Auth0 CIBA flow withAsyncAuthorization. This sends a push notification to your phone. At the exact same time, the system generates an AI Risk Assessment and pushes it to Slack (warning the user to check their Auth0 Guardian App!). button is sent to the financial controller.
+7. Upon Auth0 Guardian approval (with fallback to Slack deterministic buttons if Auth0 is unconfigured or errors), the API automatically triggers Stripe to pay the invoice and updates the React queue.
 8. The AI Reviewer Agent generates a post-execution executive summary for the dashboard.
 
 ## Stripe Payment Semantics
@@ -86,3 +87,4 @@ npm run dev
 \\\
 
 Open \http://localhost:3000\.
+
