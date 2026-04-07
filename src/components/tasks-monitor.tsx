@@ -246,12 +246,14 @@ export function TasksMonitor() {
         },
       );
     } catch (runError) {
+      const nextAttemptAt = new Date(Date.now() + 15 * 1000).toISOString();
       setItems((current) =>
         current.map((entry) =>
           entry.id === item.id
             ? {
                 ...entry,
                 status: "error",
+                nextAttemptAt,
                 timeline: [
                   ...entry.timeline,
                   runError instanceof Error ? runError.message : "Unknown queue execution failure",
