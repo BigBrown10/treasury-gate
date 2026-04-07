@@ -304,7 +304,7 @@ export function TasksMonitor() {
         (item) =>
           item.category === "salary" &&
           isDueToday(item) &&
-          (isDueNow(item) || item.status === "queued" || item.status === "waiting_invoice") &&
+
           canAutoProcess(item) &&
           isReadyForAttempt(item),
       );
@@ -317,7 +317,7 @@ export function TasksMonitor() {
         return;
       }
 
-      const next = items.find((item) => canAutoProcess(item) && isReadyForAttempt(item) && (isDueNow(item) || item.status === "queued" || item.status === "waiting_invoice"));
+      const next = items.find((item) => canAutoProcess(item) && isReadyForAttempt(item));
       if (!next) {
         return;
       }
@@ -594,4 +594,5 @@ export function TasksMonitor() {
     </section>
   );
 }
+
 
