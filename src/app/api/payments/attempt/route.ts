@@ -192,13 +192,14 @@ export async function POST(request: NextRequest) {
 
     if (
       paymentResultRaw instanceof Error ||
-      (paymentResultRaw && typeof paymentResultRaw === "object" && paymentResultRaw.code) ||
+      (paymentResultRaw && typeof paymentResultRaw === "object" && "code" in paymentResultRaw) ||
       (typeof paymentResultRaw === "string" && paymentResultRaw.includes("AUTH0_AI_INTERRUPT"))
     ) {
       if (typeof paymentResultRaw === "string" && paymentResultRaw.includes("DOES_NOT_HAVE_PUSH_NOTIFICATIONS")) {
         throw new Error("Auth0 requires Guardian push notifications set up on your device.");
       }
-      if (paymentResultRaw && typeof paymentResultRaw === "object" && paymentResultRaw.code === "ASYNC_AUTHORIZATION_USER_DOES_NOT_HAVE_PUSH_NOTIFICATIONS") {
+      const rawAsAny = paymentResultRaw as Record<string, unknown>;
+      if (rawAsAny && typeof rawAsAny === "object" && rawAsAny.code === "ASYNC_AUTHORIZATION_USER_DOES_NOT_HAVE_PUSH_NOTIFICATIONS") {
         throw new Error("Auth0 needs Guardian Push Notifications enabled.");
       }
       throw paymentResultRaw;
@@ -284,7 +285,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const message = error instanceof Error ? error.message : typeof error === "object" && error && "code" in error ? String((error as any).code || "Unknown code") : "Unknown payment attempt error";
+    const message = error instanceof Error ? error.message : typeof error === "object" && error && "code" in error ? String((error as Record<string, unknown>).code || "Unknown code") : "Unknown payment attempt error";
     return NextResponse.json({ status: "timed_out", error: message }, { status: 500 });
   }
 }
